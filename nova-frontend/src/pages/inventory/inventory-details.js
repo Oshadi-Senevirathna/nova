@@ -89,7 +89,7 @@ const DetailsPage = ({ title }) => {
                                     <Typography variant="subtitle1">Operating System</Typography>
                                 </Grid>
                                 <Grid item xs={8}>
-                                    <Typography>{device.linux_dist ? device.linux_dist : ''}</Typography>
+                                    <Typography>{device.linux_distribution ? device.linux_distribution : ''}</Typography>
                                 </Grid>
                             </Grid>
                             <Grid container spacing={3}>

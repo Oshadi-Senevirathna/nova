@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useNavigate } from '../../../node_modules/react-router/index';
+// import { useNavigate } from '../../../node_modules/react-router/index';
 import serviceFactoryInstance from 'framework/services/service-factory';
 import { ENTITY_NAME_VM_CONFIGS, ENTITY_NAME_VM_TEMPLATES } from 'framework/caching/entity-cache';
 import * as Yup from 'yup';
@@ -9,18 +9,15 @@ import AnimateButton from 'components/@extended/AnimateButton';
 // material-ui
 import { Button, FormHelperText, Grid, InputLabel, OutlinedInput, Stack, Typography } from '@mui/material';
 import configs from './vm-configs-config.json';
-import MUIDataTable from 'mui-datatables';
-import ConfirmationDialog from 'components/styledMUI/confirmation-dialog';
 import CustomSnackbar from 'components/styledMUI/Snackbar';
 import VMConfigsForm from './vm-configs-form';
 import DeviceSelectForm from './device-select-form';
+import CustomDatatable from 'components/styledMUI/Datatable';
+import { useNavigate } from '../../../node_modules/react-router-dom/dist/index';
 
 const DetailsPage = ({ title }) => {
     const params = useParams();
     const [vmTemplate, setVmTemplate] = useState();
-    const [vmConfigs, setVmConfigs] = useState();
-    const [deleteUUIDS, setDeleteUUIDS] = useState([]);
-    const [confirmDeleteForm, setConfirmDeleteForm] = useState(false);
     const [initialValues, setInitialValues] = useState({
         instance_name: ''
     });
@@ -47,38 +44,8 @@ const DetailsPage = ({ title }) => {
                     setInitialValues(temp);
                 }
             });
-
-            const configsSub = serviceFactoryInstance.dataLoaderService.dataSub(ENTITY_NAME_VM_CONFIGS).subscribe((data) => {
-                if (data) {
-                    var configsFilter = data.filter((configsTemp) => {
-                        return configsTemp.vm_template_id === params.UUID;
-                    });
-                    setVmConfigs(configsFilter);
-                }
-            });
-            return () => {
-                configsSub.unsubscribe();
-            };
         }
     }, [params.UUID, serviceFactoryInstance.cache]);
-
-    const options = {
-        onRowsDelete: (rowsDeleted, dataRows) => {
-            const rowsDeleteUUIDS = [];
-            for (let i = 0; i < rowsDeleted.data.length; i++) {
-                rowsDeleteUUIDS.push(vmConfigs[rowsDeleted.data[i].dataIndex].UUID);
-            }
-            setDeleteUUIDS(rowsDeleteUUIDS);
-            setConfirmDeleteForm(true);
-        },
-        filter: false,
-        onRowClick: (rowData, rowMeta) => {
-            setUUID(vmConfigs[rowMeta.dataIndex].UUID);
-            openForm();
-        },
-        rowsPerPage: 10,
-        rowsPerPageOptions: [10, 25, 50]
-    };
 
     const closeForm = () => {
         setUUID();
@@ -121,27 +88,8 @@ const DetailsPage = ({ title }) => {
         }
     };
 
-    const handleDeleteOK = () => {
-        deleteData(deleteUUIDS);
-        setConfirmDeleteForm(false);
-    };
-
-    const handleDeleteCancel = () => {
-        setConfirmDeleteForm(false);
-    };
-
     return (
         <>
-            <ConfirmationDialog
-                open={confirmDeleteForm}
-                title="Delete Confirmation"
-                message={
-                    (deleteUUIDS.length > 1 && `Are you sure you want to delete the templates?`) ||
-                    (deleteUUIDS.length === 1 && `Are you sure you want to delete the template?`)
-                }
-                onOK={handleDeleteOK}
-                onCancel={handleDeleteCancel}
-            />
             <CustomSnackbar msg={successSnackbarMessage} onClose={() => setSuccessSnackbarMessage('')} severity="success" title="Success" />
             <CustomSnackbar msg={errorSnackbarMessage} onClose={() => setErrorSnackbarMessage('')} severity="error" title="Error" />
 
@@ -296,7 +244,14 @@ const DetailsPage = ({ title }) => {
                     {params.UUID && (
                         <>
                             <Typography variant="h5">VNF configs saved under this template</Typography>
-                            <MUIDataTable options={options} data={vmConfigs} columns={configs.fields} />
+                            <CustomDatatable
+                                entityName={ENTITY_NAME_VM_CONFIGS}
+                                configs={configs}
+                                deleteData={deleteData}
+                                setUUID={setUUID}
+                                openForm={openForm}
+                                presetFilterValue={params.UUID}
+                            />
                             <VMConfigsForm
                                 formOpen={formOpen}
                                 closeForm={closeForm}

@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react';
-import serviceFactoryInstance from 'framework/services/service-factory';
 import configs from './logs-config.json';
 import { makeStyles } from '../../../node_modules/@mui/styles/index';
 import { Typography } from '../../../node_modules/@mui/material/index';
 import { ENTITY_NAME_LOGS_USER } from 'framework/caching/entity-cache';
-import MUIDataTable from 'mui-datatables';
 import moment from '../../../node_modules/moment/moment';
+import CustomDatatable from 'components/styledMUI/Datatable';
 
 const useStyles = makeStyles((theme) => ({
     root: {
@@ -29,12 +27,6 @@ const useStyles = makeStyles((theme) => ({
 
 const LogsPages = () => {
     const classes = useStyles();
-    const [instances, setInstances] = useState([]);
-
-    const [noOfInstances, setNoOfInstances] = useState(10);
-    const [startOfInstances, setStartOfInstances] = useState(0);
-    const [count, setCount] = useState(0);
-    const [page, setPage] = useState(0);
 
     var configReshaped = configs;
     for (let i = 0; i < configReshaped.fields.length; i++) {
@@ -49,57 +41,16 @@ const LogsPages = () => {
         }
     }
 
-    useEffect(() => {
-        const logsSub = serviceFactoryInstance.dataLoaderService
-            .dataSub(ENTITY_NAME_LOGS_USER, undefined, noOfInstances, startOfInstances)
-            .subscribe((data) => {
-                if (data) {
-                    setInstances(data);
-                }
-            });
-
-        return () => {
-            logsSub.unsubscribe();
-        };
-    }, [serviceFactoryInstance.cache, noOfInstances, startOfInstances]);
-
-    useEffect(() => {
-        const logsCountSub = serviceFactoryInstance.dataLoaderService.countSub(ENTITY_NAME_LOGS_USER).subscribe((data) => {
-            if (data) {
-                setCount(data);
-            }
-        });
-
-        return () => {
-            logsCountSub.unsubscribe();
-        };
-    }, [serviceFactoryInstance.cache]);
-
-    const options = {
-        selectableRowsHideCheckboxes: true,
-        count: count,
-        rowsPerPage: 10,
-        rowsPerPageOptions: [10, 25, 50],
-        serverSide: true,
-        page: page,
-        filter: false,
-
-        onChangePage(currentPage) {
-            setPage(currentPage);
-            setStartOfInstances(currentPage * noOfInstances);
-        },
-        onChangeRowsPerPage(numberOfRows) {
-            setPage(0);
-            setStartOfInstances(0);
-            setNoOfInstances(numberOfRows);
-        }
-    };
-
     return (
         <div className={classes.root}>
             <Typography className={classes.heading}>{configReshaped.name}</Typography>
             <div style={{ marginRight: 20 }}>
-                <MUIDataTable options={options} data={instances} columns={configReshaped.fields} />
+                <CustomDatatable
+                    entityName={ENTITY_NAME_LOGS_USER}
+                    configs={configReshaped}
+                    initSortField={'timestamp'}
+                    initSortDirection={-1}
+                />
             </div>
         </div>
     );

@@ -9,6 +9,7 @@ import { Formik } from 'formik';
 // project import
 import AnimateButton from 'components/@extended/AnimateButton';
 // material-ui
+import * as Yup from 'yup';
 
 // ============================|| FIREBASE - LOGIN ||============================ //
 
@@ -20,9 +21,18 @@ const DestroyVMForm = ({ formOpen, closeForm, setSuccessSnackbarMessage, setErro
     const [devices, setDevices] = useState([]);
     const [vms, setVms] = useState([]);
     const [device, setDevice] = useState();
+    const [tenant, setTenant] = useState();
+    useEffect(() => {
+        const tenantSub = serviceFactoryInstance.authService.getTenantObservable().subscribe((tenant) => {
+            setTenant(tenant);
+        });
+        return () => {
+            tenantSub.unsubscribe();
+        };
+    }, [serviceFactoryInstance.authService]);
 
     useEffect(() => {
-        const devicesSub = serviceFactoryInstance.dataLoaderService.dataSub(`${ENTITY_NAME_DEVICE}>summary`).subscribe((data) => {
+        const devicesSub = serviceFactoryInstance.dataLoaderService.dataSub(ENTITY_NAME_DEVICE, tenant).subscribe((data) => {
             if (data) {
                 setDevices(data);
             }
@@ -31,10 +41,9 @@ const DestroyVMForm = ({ formOpen, closeForm, setSuccessSnackbarMessage, setErro
         return () => {
             devicesSub.unsubscribe();
         };
-    }, [serviceFactoryInstance.cache]);
+    }, [serviceFactoryInstance.cache, tenant]);
 
     useEffect(() => {
-        console.log(device);
         if (device) {
             const findBy = '["device_id"]';
             const value = `["${device}"]`;
@@ -61,13 +70,17 @@ const DestroyVMForm = ({ formOpen, closeForm, setSuccessSnackbarMessage, setErro
             <Formik
                 enableReinitialize
                 initialValues={initialValues}
+                validationSchema={Yup.object().shape({
+                    device_id: Yup.string().required('Device is required'),
+                    vm_id: Yup.string().required('VNF is required')
+                })}
                 onSubmit={async (values, { setErrors, setSubmitting }) => {
                     var job = {};
                     job.job_name = 'Destroy VNF';
                     job.arguments = values;
                     setSubmitting(true);
                     serviceFactoryInstance.dataLoaderService
-                        .addInstance(ENTITY_NAME_FRONTEND_JOBS, job)
+                        .addJob(ENTITY_NAME_FRONTEND_JOBS, job)
                         .then((data) => {
                             if (data.status) {
                                 setSubmitting(false);
@@ -142,7 +155,7 @@ const DestroyVMForm = ({ formOpen, closeForm, setSuccessSnackbarMessage, setErro
                                                   (vm) =>
                                                       vm && (
                                                           <MenuItem key={vm.UUID} value={vm.UUID}>
-                                                              {vm.instance_name}
+                                                              {vm.UUID}
                                                           </MenuItem>
                                                       )
                                               )

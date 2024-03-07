@@ -1,7 +1,7 @@
 {
-    "name": "Tenant",
-    "single": "tenant",
-    "multiple": "tenants",
+    "name": "Company",
+    "single": "company",
+    "multiple": "companies",
     "fields": [
         {
             "name": "instance_name",

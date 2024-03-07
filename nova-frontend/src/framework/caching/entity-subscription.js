@@ -42,7 +42,7 @@ class EntitySubscription {
         this.entity.sortDirection = this.sortDirection;
         this.entity.filterField = this.filterField;
         this.entity.filterValue = this.filterValue;
-        console.log('EntitySubscription:load ', this.entity);
+        //console.log('EntitySubscription:load ', this.entity);
         this.service.loadData(this.entity, (data) => {
             this.data = data.instances;
             this.count = data.count ? data.count : data.instances.length;
@@ -56,14 +56,14 @@ class EntitySubscription {
     }
 
     add() {
-        console.log('EntitySubscription:add ', this.entity);
+        //console.log('EntitySubscription:add ', this.entity);
         if (this.startOfInstances >= this.count - this.noOfInstances || !this.noOfInstances) {
             this.load();
         }
     }
 
     delete(newData) {
-        console.log('EntitySubscription:delete ', this.entity);
+        //console.log('EntitySubscription:delete ', this.entity);
         var dataTemp = [];
 
         newData.forEach((newDataItem) => {
@@ -74,14 +74,14 @@ class EntitySubscription {
                 })
             ];
         });
-        console.log(this.data, newData, dataTemp);
+        //console.log(this.data, newData, dataTemp);
         if (dataTemp.length > 0) {
             this.load();
         }
     }
 
     update(newData) {
-        console.log('EntitySubscription:update ', this.entity);
+        //console.log('EntitySubscription:update ', this.entity);
         var dataTemp = [];
         newData.forEach((newDataItem) => {
             dataTemp = [

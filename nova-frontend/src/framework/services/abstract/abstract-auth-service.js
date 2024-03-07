@@ -7,8 +7,6 @@ class AbstractAuthService {
 
     resetPassword() {}
 
-    isLoggedIn() {}
-
     hasPrivilege(privilege) {}
 }
 

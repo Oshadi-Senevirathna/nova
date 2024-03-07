@@ -24,12 +24,12 @@ import { Formik } from 'formik';
 import AnimateButton from 'components/@extended/AnimateButton';
 // assets
 import { EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
+import { USER_TYPE_SUPER_ADMIN } from 'framework/caching/entity-cache';
 
 // ============================|| FIREBASE - LOGIN ||============================ //
 
 const AuthLogin = () => {
     const [checked, setChecked] = React.useState(false);
-    const [error, setError] = React.useState('');
     const [showPassword, setShowPassword] = React.useState(false);
     const navigate = useNavigate();
     const handleClickShowPassword = () => {
@@ -40,23 +40,6 @@ const AuthLogin = () => {
         event.preventDefault();
     };
 
-    /* const login = (event) => {
-        setError('');
-        serviceFactoryInstance.authService.login(username, password, (status, reason) => {
-            if (status) {
-                let destRoute = JSON.parse(localStorage.getItem('destRoute'));
-                if (destRoute !== null && destRoute !== undefined && destRoute !== '') {
-                    localStorage.removeItem('destRoute');
-                    history.push(destRoute);
-                } else {
-                    history.push('/');
-                }
-            } else {
-                setError(reason);
-            }
-        });
-    };
- */
     return (
         <>
             <Formik
@@ -65,26 +48,27 @@ const AuthLogin = () => {
                     password: '',
                     submit: null
                 }}
+                // validationSchema={Yup.object().shape({
+                //     email: Yup.string().email('Must be a valid email').max(255).required('Email is required'),
+                //     password: Yup.string().max(255).required('Password is required')
+                // })}
                 validationSchema={Yup.object().shape({
-                    email: Yup.string().email('Must be a valid email').max(255).required('Email is required'),
+                    email: Yup.string().when({
+                        is: (value) => value !== USER_TYPE_SUPER_ADMIN,
+                        then: Yup.string().email('Must be a valid email').max(255).required('Email is required')
+                    }),
                     password: Yup.string().max(255).required('Password is required')
                 })}
                 onSubmit={async (values, { setErrors, setStatus, setSubmitting }) => {
                     serviceFactoryInstance.authService.login(values.email, values.password, (status, reason) => {
                         if (status) {
-                            navigate('/');
+                            setStatus({ success: true });
                         } else {
-                            setError(reason);
+                            setStatus({ success: false });
+                            setErrors({ submit: reason });
                         }
+                        setSubmitting(false);
                     });
-                    try {
-                        setStatus({ success: false });
-                        setSubmitting(false);
-                    } catch (err) {
-                        setStatus({ success: false });
-                        setErrors({ submit: err.message });
-                        setSubmitting(false);
-                    }
                 }}
             >
                 {({ errors, handleBlur, handleChange, handleSubmit, isSubmitting, touched, values }) => (
@@ -158,7 +142,7 @@ const AuthLogin = () => {
                                                 size="small"
                                             />
                                         }
-                                        label={<Typography variant="h6">Keep me sign in</Typography>}
+                                        label={<Typography variant="h6">Keep me signed in</Typography>}
                                     />
                                     <Link variant="h6" component={RouterLink} to="/forgot-password" color="text.primary">
                                         Forgot Password?

@@ -2,13 +2,12 @@ import { makeStyles } from '../../../node_modules/@mui/styles/index';
 import { Button, Grid } from '@mui/material';
 import { ENTITY_NAME_COMPANY } from 'framework/caching/entity-cache';
 import serviceFactoryInstance from 'framework/services/service-factory';
-import MUIDataTable from 'mui-datatables';
 import { useEffect, useState } from 'react';
-import ConfirmationDialog from 'components/styledMUI/confirmation-dialog';
 import configs from './company-config.json';
 import CompanyForm from './company-form';
 import CustomSnackbar from 'components/styledMUI/Snackbar';
 import AnimateButton from 'components/@extended/AnimateButton';
+import CustomDatatable from 'components/styledMUI/Datatable';
 
 const useStyles = makeStyles((theme) => ({
     root: {
@@ -36,15 +35,8 @@ const useStyles = makeStyles((theme) => ({
 
 const CompanyPage = ({ title }) => {
     const classes = useStyles();
-    const [companies, setCompanies] = useState([]);
     const [UUID, setUUID] = useState();
     const [formOpen, setFormOpen] = useState(false);
-    const [deleteUUIDS, setDeleteUUIDS] = useState([]);
-    const [confirmDeleteForm, setConfirmDeleteForm] = useState(false);
-    const [noOfInstances, setNoOfInstances] = useState(10);
-    const [startOfInstances, setStartOfInstances] = useState(0);
-    const [companiesCount, setCompaniesCount] = useState(0);
-    const [page, setPage] = useState(0);
     const [errorSnackbarMessage, setErrorSnackbarMessage] = useState('');
     const [successSnackbarMessage, setSuccessSnackbarMessage] = useState('');
 
@@ -53,32 +45,6 @@ const CompanyPage = ({ title }) => {
     }, []);
 
     var configReshaped = configs;
-
-    useEffect(() => {
-        const companiesSub = serviceFactoryInstance.dataLoaderService
-            .dataSub(ENTITY_NAME_COMPANY, undefined, noOfInstances, startOfInstances)
-            .subscribe((data) => {
-                if (data) {
-                    setCompanies(data);
-                }
-            });
-
-        return () => {
-            companiesSub.unsubscribe();
-        };
-    }, [serviceFactoryInstance.cache, noOfInstances, startOfInstances]);
-
-    useEffect(() => {
-        const companiesCountSub = serviceFactoryInstance.dataLoaderService.countSub(ENTITY_NAME_COMPANY).subscribe((data) => {
-            if (data) {
-                setCompaniesCount(data);
-            }
-        });
-
-        return () => {
-            companiesCountSub.unsubscribe();
-        };
-    }, [serviceFactoryInstance.cache]);
 
     const closeForm = () => {
         setUUID();
@@ -107,61 +73,17 @@ const CompanyPage = ({ title }) => {
         }
     };
 
-    const handleDeleteOK = () => {
-        deleteData(deleteUUIDS);
-        setConfirmDeleteForm(false);
-    };
-
-    const handleDeleteCancel = () => {
-        setConfirmDeleteForm(false);
-    };
-
-    const options = {
-        onRowsDelete: (rowsDeleted, dataRows) => {
-            const rowsDeleteUUIDS = [];
-            for (let i = 0; i < rowsDeleted.data.length; i++) {
-                rowsDeleteUUIDS.push(companies[rowsDeleted.data[i].dataIndex].UUID);
-            }
-            setDeleteUUIDS(rowsDeleteUUIDS);
-            setConfirmDeleteForm(true);
-        },
-        onRowClick: (rowData, rowMeta) => {
-            setUUID(companies[rowMeta.dataIndex].UUID);
-            openForm();
-        },
-        count: companiesCount,
-        rowsPerPage: 10,
-        rowsPerPageOptions: [10, 25, 50],
-        serverSide: true,
-        page: page,
-        filter: false,
-        onChangePage(currentPage) {
-            setPage(currentPage);
-            setStartOfInstances(currentPage * noOfInstances);
-        },
-        onChangeRowsPerPage(numberOfRows) {
-            setPage(0);
-            setStartOfInstances(0);
-            setNoOfInstances(numberOfRows);
-        }
-    };
-
     return (
         <div className={classes.root}>
-            <ConfirmationDialog
-                open={confirmDeleteForm}
-                title="Delete Confirmation"
-                message={
-                    (deleteUUIDS.length > 1 && `Are you sure you want to delete the companies?`) ||
-                    (deleteUUIDS.length === 1 && `Are you sure you want to delete the company?`)
-                }
-                onOK={handleDeleteOK}
-                onCancel={handleDeleteCancel}
-            />
             <CustomSnackbar msg={successSnackbarMessage} onClose={() => setSuccessSnackbarMessage('')} severity="success" title="Success" />
             <CustomSnackbar msg={errorSnackbarMessage} onClose={() => setErrorSnackbarMessage('')} severity="error" title="Error" />
-
-            <MUIDataTable options={options} data={companies} columns={configReshaped.fields} />
+            <CustomDatatable
+                entityName={ENTITY_NAME_COMPANY}
+                configs={configReshaped}
+                deleteData={deleteData}
+                setUUID={setUUID}
+                openForm={openForm}
+            />
             <CompanyForm
                 formOpen={formOpen}
                 closeForm={closeForm}

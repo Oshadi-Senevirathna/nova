@@ -4,12 +4,11 @@ import { Button, IconButton } from '@mui/material';
 import { ENTITY_NAME_VM_IMAGE } from 'framework/caching/entity-cache';
 import serviceFactoryInstance from 'framework/services/service-factory';
 import moment from 'moment';
-import MUIDataTable from 'mui-datatables';
 import { useEffect, useState } from 'react';
-import ConfirmationDialog from 'components/styledMUI/confirmation-dialog';
 import configs from './vm-image-config.json';
-import InventoryForm from './vm-image-form';
+import VMImageForm from './vm-image-form';
 import CustomSnackbar from 'components/styledMUI/Snackbar';
+import CustomDatatable from 'components/styledMUI/Datatable';
 
 const useStyles = makeStyles((theme) => ({
     root: {
@@ -37,15 +36,8 @@ const useStyles = makeStyles((theme) => ({
 
 const VMImagePage = ({ title }) => {
     const classes = useStyles();
-    const [vmImages, setVMImages] = useState([]);
     const [UUID, setUUID] = useState();
     const [formOpen, setFormOpen] = useState(false);
-    const [deleteUUIDS, setDeleteUUIDS] = useState([]);
-    const [confirmDeleteForm, setConfirmDeleteForm] = useState(false);
-    const [noOfInstances, setNoOfInstances] = useState(10);
-    const [startOfInstances, setStartOfInstances] = useState(0);
-    const [count, setCount] = useState(0);
-    const [page, setPage] = useState(0);
     const [errorSnackbarMessage, setErrorSnackbarMessage] = useState('');
     const [successSnackbarMessage, setSuccessSnackbarMessage] = useState('');
 
@@ -96,32 +88,6 @@ const VMImagePage = ({ title }) => {
         }
     }
 
-    useEffect(() => {
-        const vmImageSub = serviceFactoryInstance.dataLoaderService
-            .dataSub(ENTITY_NAME_VM_IMAGE, undefined, noOfInstances, startOfInstances)
-            .subscribe((data) => {
-                if (data) {
-                    setVMImages(data);
-                }
-            });
-
-        return () => {
-            vmImageSub.unsubscribe();
-        };
-    }, [serviceFactoryInstance.cache, noOfInstances, startOfInstances]);
-
-    useEffect(() => {
-        const vmImagesCountSub = serviceFactoryInstance.dataLoaderService.countSub(ENTITY_NAME_VM_IMAGE).subscribe((data) => {
-            if (data) {
-                setCount(data);
-            }
-        });
-
-        return () => {
-            vmImagesCountSub.unsubscribe();
-        };
-    }, [serviceFactoryInstance.cache]);
-
     const closeForm = () => {
         setUUID();
         setFormOpen(false);
@@ -149,61 +115,18 @@ const VMImagePage = ({ title }) => {
         }
     };
 
-    const handleDeleteOK = () => {
-        deleteData(deleteUUIDS);
-        setConfirmDeleteForm(false);
-    };
-
-    const handleDeleteCancel = () => {
-        setConfirmDeleteForm(false);
-    };
-
-    const options = {
-        onRowsDelete: (rowsDeleted, dataRows) => {
-            const rowsDeleteUUIDS = [];
-            for (let i = 0; i < rowsDeleted.data.length; i++) {
-                rowsDeleteUUIDS.push(vmImages[rowsDeleted.data[i].dataIndex].UUID);
-            }
-            setDeleteUUIDS(rowsDeleteUUIDS);
-            setConfirmDeleteForm(true);
-        },
-        count: count,
-        rowsPerPage: 10,
-        rowsPerPageOptions: [10, 25, 50],
-        serverSide: true,
-        page: page,
-        onRowClick: (rowData, rowMeta) => {
-            setUUID(vmImages[rowMeta.dataIndex].UUID);
-            openForm();
-        },
-        filter: false,
-        onChangePage(currentPage) {
-            setPage(currentPage);
-            setStartOfInstances(currentPage * noOfInstances);
-        },
-        onChangeRowsPerPage(numberOfRows) {
-            setPage(0);
-            setStartOfInstances(0);
-            setNoOfInstances(numberOfRows);
-        }
-    };
-
     return (
         <div className={classes.root}>
-            <ConfirmationDialog
-                open={confirmDeleteForm}
-                title="Delete Confirmation"
-                message={
-                    (deleteUUIDS.length > 1 && `Are you sure you want to delete the images?`) ||
-                    (deleteUUIDS.length === 1 && `Are you sure you want to delete the image?`)
-                }
-                onOK={handleDeleteOK}
-                onCancel={handleDeleteCancel}
-            />
             <CustomSnackbar msg={successSnackbarMessage} onClose={() => setSuccessSnackbarMessage('')} severity="success" title="Success" />
             <CustomSnackbar msg={errorSnackbarMessage} onClose={() => setErrorSnackbarMessage('')} severity="error" title="Error" />
-            <MUIDataTable options={options} data={vmImages} columns={configReshaped.fields} />
-            <InventoryForm
+            <CustomDatatable
+                entityName={ENTITY_NAME_VM_IMAGE}
+                configs={configReshaped}
+                deleteData={deleteData}
+                setUUID={setUUID}
+                openForm={openForm}
+            />
+            <VMImageForm
                 formOpen={formOpen}
                 closeForm={closeForm}
                 UUID={UUID}

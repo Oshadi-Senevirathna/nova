@@ -3,6 +3,8 @@ import { createSlice } from '@reduxjs/toolkit';
 
 // initial state
 const initialState = {
+    // selectedTenant: null,
+    // selectedTenantDetails: null,
     openItem: ['dashboard'],
     openComponent: 'buttons',
     drawerOpen: false,
@@ -30,6 +32,12 @@ const menu = createSlice({
         openComponentDrawer(state, action) {
             state.componentDrawerOpen = action.payload.componentDrawerOpen;
         }
+        // setSelectedTenant(state, action) {
+        //     state.selectedTenant = action.payload.selectedTenant;
+        // },
+        // setTenantDetails(state, action) {
+        //     state.selectedTenantDetails = action.payload.selectedTenantDetails;
+        // }
     }
 });
 

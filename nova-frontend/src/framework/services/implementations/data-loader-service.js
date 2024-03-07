@@ -38,15 +38,11 @@ const entities = {
     },
     [ENTITY_NAME_LOGS_USER]: {
         name: ENTITY_NAME_LOGS_USER,
-        endpoint: `/get_filtered_and_sorted_instances?sort_by=timestamp&sort_direction=-1&entity_name=${ENTITY_NAME_LOGS_USER}`
+        endpoint: `/get_filtered_and_sorted_instances?entity_name=${ENTITY_NAME_LOGS_USER}&company_only=true`
     },
     [ENTITY_NAME_INVENTORY_LOGS]: {
         name: ENTITY_NAME_INVENTORY_LOGS,
         endpoint: `/get_filtered_and_sorted_instances?sort_by=timestamp&sort_direction=-1&entity_name=${ENTITY_NAME_INVENTORY_LOGS}`
-    },
-    [ENTITY_NAME_USER_PRIVILEGES]: {
-        name: ENTITY_NAME_USER_PRIVILEGES,
-        endpoint: `/get_filtered_and_sorted_instances?entity_name=${ENTITY_NAME_USER_PRIVILEGES}`
     },
     [ENTITY_NAME_SETTINGS]: {
         name: ENTITY_NAME_SETTINGS,
@@ -62,63 +58,72 @@ const entities = {
     },
     [ENTITY_NAME_VM_CONFIGS]: {
         name: ENTITY_NAME_VM_CONFIGS,
-        endpoint: `/get_filtered_and_sorted_instances?entity_name=${ENTITY_NAME_VM_CONFIGS}`
+        endpoint: `/get_filtered_and_sorted_instances?entity_name=${ENTITY_NAME_VM_CONFIGS}&company_only=true`
     },
     [ENTITY_NAME_VM_TEMPLATES]: {
         name: ENTITY_NAME_VM_TEMPLATES,
-        endpoint: `/get_filtered_and_sorted_instances?entity_name=${ENTITY_NAME_VM_TEMPLATES}`
+        endpoint: `/get_filtered_and_sorted_instances?entity_name=${ENTITY_NAME_VM_TEMPLATES}&company_only=true`
     },
     [`${ENTITY_NAME_VM_TEMPLATES}>summary`]: {
         name: ENTITY_NAME_VM_TEMPLATES,
-        endpoint: `/get_filtered_and_sorted_instances_summary?entity_name=${ENTITY_NAME_VM_TEMPLATES}`
+        endpoint: `/get_filtered_and_sorted_instances_summary?entity_name=${ENTITY_NAME_VM_TEMPLATES}&company_only=true`
     },
     [ENTITY_NAME_VM_IMAGE]: {
         name: ENTITY_NAME_VM_IMAGE,
-        endpoint: `/get_filtered_and_sorted_instances?entity_name=${ENTITY_NAME_VM_IMAGE}`
+        endpoint: `/get_filtered_and_sorted_instances?entity_name=${ENTITY_NAME_VM_IMAGE}&company_only=true`
     },
     [`${ENTITY_NAME_VM_IMAGE}>summary`]: {
         name: ENTITY_NAME_VM_IMAGE,
-        endpoint: `/get_filtered_and_sorted_instances_summary?entity_name=${ENTITY_NAME_VM_IMAGE}`
+        endpoint: `/get_filtered_and_sorted_instances_summary?entity_name=${ENTITY_NAME_VM_IMAGE}&company_only=true`
     },
     [ENTITY_NAME_FRONTEND_JOBS]: {
         name: ENTITY_NAME_FRONTEND_JOBS,
-        endpoint: `/get_filtered_and_sorted_instances?sort_by=created_at&sort_direction=-1&entity_name=${ENTITY_NAME_FRONTEND_JOBS}`
+        endpoint: `/get_filtered_and_sorted_instances?sort_by=created_at&sort_direction=-1&entity_name=${ENTITY_NAME_FRONTEND_JOBS}&company_only=true`
     },
     [ENTITY_NAME_USERS]: {
         name: ENTITY_NAME_USERS,
-        endpoint: `/get_users?entity_name=${ENTITY_NAME_USERS}`
+        endpoint: `/get_users?entity_name=${ENTITY_NAME_USERS}&company_only=true`
     },
     [ENTITY_NAME_USER_ROLES]: {
         name: ENTITY_NAME_USER_ROLES,
-        endpoint: `/get_roles?entity_name=${ENTITY_NAME_USER_ROLES}`
+        endpoint: `/get_filtered_and_sorted_instances?entity_name=${ENTITY_NAME_USER_ROLES}&company_only=true`
+    },
+    [ENTITY_NAME_USER_PRIVILEGES]: {
+        name: ENTITY_NAME_USER_PRIVILEGES,
+        endpoint: `/get_filtered_and_sorted_instances?entity_name=${ENTITY_NAME_USER_PRIVILEGES}`
     },
     [`${ENTITY_NAME_DEVICE}>dashboard>device_status`]: {
         name: ENTITY_NAME_DEVICE,
-        endpoint: '/dashboard_device_status'
+        endpoint: '/dashboard_device_status?tenant=0'
+    },
+    //JOBS api
+    [`${ENTITY_NAME_FRONTEND_JOBS}>dashboard>jobs_status`]: {
+        name: ENTITY_NAME_FRONTEND_JOBS,
+        endpoint: '/dashboard_job_details?'
     },
     [`${ENTITY_NAME_DEVICE}>dashboard>device_os`]: {
         name: ENTITY_NAME_DEVICE,
-        endpoint: '/dashboard_device_os'
+        endpoint: '/dashboard_device_os?tenant=0'
     },
     [`${ENTITY_NAME_FRONTEND_JOBS}>dashboard>job`]: {
         name: ENTITY_NAME_FRONTEND_JOBS,
-        endpoint: '/dashboard_job'
+        endpoint: '/dashboard_job?company_only=true'
     },
     [`${ENTITY_NAME_DEVICE}>dashboard>count_device`]: {
         name: ENTITY_NAME_DEVICE,
-        endpoint: `/dashboard_count?entity_name=${ENTITY_NAME_DEVICE}`
+        endpoint: `/dashboard_count?entity_name=${ENTITY_NAME_DEVICE}&tenant=0`
     },
     [`${ENTITY_NAME_VM_IMAGE}>dashboard>count_vm_image`]: {
         name: ENTITY_NAME_VM_IMAGE,
-        endpoint: `/dashboard_count?entity_name=${ENTITY_NAME_VM_IMAGE}`
+        endpoint: `/dashboard_count?entity_name=${ENTITY_NAME_VM_IMAGE}&company_only=true`
     },
     [`${ENTITY_NAME_TENANT}>dashboard>count_tenant`]: {
         name: ENTITY_NAME_TENANT,
         endpoint: `/dashboard_count?entity_name=${ENTITY_NAME_TENANT}`
     },
-    [`${ENTITY_NAME_FRONTEND_JOBS}>dashboard>count_frontend_jobs_job_picked`]: {
-        name: ENTITY_NAME_FRONTEND_JOBS,
-        endpoint: `/dashboard_count?entity_name=${ENTITY_NAME_FRONTEND_JOBS}&findBy=status&value=JOB_PICKED`
+    [`${ENTITY_NAME_FRONTEND_JOBS}>dashboard>count_jobs`]: {
+        name: ENTITY_NAME_TENANT,
+        endpoint: `/dashboard_count?entity_name=${ENTITY_NAME_FRONTEND_JOBS}`
     }
 };
 
@@ -133,7 +138,19 @@ class DataLoaderService extends AbstractDataLoaderService {
         });
     }
 
-    dataSub(entity_name, tenant, noOfInstances, startOfInstances, queryString, fields, sortField, sortDirection, filterField, filterValue) {
+    dataSub(
+        entity_name,
+        tenant,
+        tenantUUID,
+        noOfInstances,
+        startOfInstances,
+        queryString,
+        fields,
+        sortField,
+        sortDirection,
+        filterField,
+        filterValue
+    ) {
         if (entity_name) {
             if (this.cache.mapEntitySubscriptions.get(entity_name) === undefined) {
                 if (entities.hasOwnProperty(entity_name)) {
@@ -142,6 +159,7 @@ class DataLoaderService extends AbstractDataLoaderService {
                         this,
                         entity,
                         tenant,
+                        tenantUUID,
                         noOfInstances,
                         startOfInstances,
                         queryString,
@@ -162,6 +180,7 @@ class DataLoaderService extends AbstractDataLoaderService {
                 .getEntitySubscription(entity_name)
                 .getObservable(
                     tenant,
+                    tenantUUID,
                     noOfInstances,
                     startOfInstances,
                     queryString,
@@ -183,6 +202,265 @@ class DataLoaderService extends AbstractDataLoaderService {
             }
         } else {
             return EMPTY;
+        }
+    }
+    async getData(endpoint) {
+        const token = serviceFactoryInstance.authService.getAuthToken();
+        const sessionID = serviceFactoryInstance.authService.getSessionID();
+        const requestOptions = {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + token,
+                Session: sessionID
+            }
+        };
+
+        try {
+            const response = await fetch(`${config.nodeURL}${endpoint}`, requestOptions);
+            console.log('Response', response);
+            if (!response.ok) {
+                if (response.status === 400) {
+                    // Handle bad requests (status code 400) appropriately
+                    throw new Error('Bad Request: The request is malformed or invalid.');
+                } else {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+            }
+
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            throw error;
+        }
+    }
+    async getTenantsUUIDByUser(entityName, userUUID) {
+        const endpoint = `/getTenantsByUser?entity_name=${entityName}&UUID=${userUUID}`;
+        console.log('Endpoint:', endpoint);
+        try {
+            const data = await this.getData(endpoint);
+            console.log('Response data from user tenants:', data.tenantIds);
+            const tenantIds = data && data.tenantIds;
+
+            console.log('TenantId:', tenantIds);
+            return tenantIds;
+        } catch (error) {
+            console.error('Error fetching device tenant by user:', error);
+            throw error;
+        }
+    }
+
+    async getDeviceCountByTenant(entityName, tenantUUID) {
+        console.log('came tenant uuid', tenantUUID);
+        const endpoint = `/dashboard_count_device_by_tenant?entity_name=${entityName}&tenant=${tenantUUID}`;
+        console.log('Endpoint:', endpoint); // Add this line for debugging
+        try {
+            const data = await this.getData(endpoint);
+            console.log('Response data for count deevice count:', data); // Add this line for debugging
+            return data.count;
+        } catch (error) {
+            console.error('Error fetching device count by tenant:', error);
+            throw error;
+        }
+    }
+    async getAllDevicesCountForJobs(entityName) {
+        const endpoint = `/dashboard_count_device_all_jobs?entity_name=${entityName}`;
+
+        try {
+            const data = await this.getData(endpoint);
+            console.log('Response data for all jobss :', data);
+            return data.count.count;
+        } catch (error) {
+            console.error('Error fetching all device count by tenant:', error);
+            throw error;
+        }
+    }
+    async getAllDevicesCount(entityName) {
+        const endpoint = `/dashboard_count_device_all?entity_name=${entityName}`;
+
+        try {
+            const data = await this.getData(endpoint);
+            console.log('Response data for all :', data);
+            return data.count;
+        } catch (error) {
+            console.error('Error fetching all device count by tenant:', error);
+            throw error;
+        }
+    }
+    async getAllTenantCountByuser(entityName, UUID) {
+        const endpoint = `/dashboard_count_tenant_all?entity_name=${entityName}&UUID=${UUID}`;
+
+        try {
+            const data = await this.getData(endpoint);
+            console.log('Response data for all TENANT:', data.count);
+
+            return data.count.count;
+        } catch (error) {
+            console.error('Error fetching all device count by tenant:', error);
+            throw error;
+        }
+    }
+
+    async getAllTenantAllCount(entityName) {
+        const endpoint = `/dashboard_count_tenant_all_superadmin?entity_name=${entityName}`;
+
+        try {
+            const data = await this.getData(endpoint);
+            console.log('Response data for all TENANT all superadmin:', data.count);
+
+            return data.count;
+        } catch (error) {
+            console.error('Error fetching all device count by tenant:', error);
+            console.error('Error details:', error.response?.data);
+            throw error;
+        }
+    }
+    // getting the device ids
+    async getDeviceIdsByTenant(entityName, tenantUUID) {
+        const endpoint = `/dashboard_device_ids_by_tenant?entity_name=${entityName}&tenant=${tenantUUID}`;
+        console.log('Endpoint:', endpoint); // Add this line for debugging
+        try {
+            const data = await this.getData(endpoint);
+            console.log('Response data for device idS:', data); // Add this line for debugging
+            return data.deviceIds; // Assuming the response contains an array of device IDs
+        } catch (error) {
+            console.error('Error fetching device IDs by tenant:', error);
+            throw error;
+        }
+    }
+    //getdevice names
+    async getDataById(entityName, deviceId) {
+        console.log('Idaa', deviceId);
+        const endpoint = `/dashboard_device_names_by_deviceIds_jobs?entity_name=${entityName}&UUID=${deviceId}`;
+        console.log('Endpoint:', endpoint); // Add this line for debugging
+        try {
+            const data = await this.getData(endpoint);
+            console.log('Response data for device names in jobs:', data); // Add this line for debugging
+            return data.devicenames; // Assuming the response contains an array of device IDs
+        } catch (error) {
+            console.error('Error fetching device IDs by tenant:', error);
+            throw error;
+        }
+    }
+    async getDevicenameByDeviceID(entityName, deviceId) {
+        console.log('Idaa', deviceId);
+        const endpoint = `/dashboard_device_names_by_deviceIds?entity_name=${entityName}&UUID=${deviceId}`;
+        console.log('Endpoint:', endpoint); // Add this line for debugging
+        try {
+            const data = await this.getData(endpoint);
+            console.log('Response data for device names in jobs names:', data); // Add this line for debugging
+            return data.devicenames; // Assuming the response contains an array of device IDs
+        } catch (error) {
+            console.error('Error fetching device IDs by device names:', error);
+            throw error;
+        }
+    }
+
+    //getTenants
+    // async getTenant(entityName, UserUUID, unshaped) {
+    //     let unshapedTemp;
+    //     if (unshaped === false) {
+    //         unshapedTemp = false;
+    //     } else {
+    //         unshapedTemp = true;
+    //     }
+    //     const endpoint = `/get_tenants?entity_name=${entityName}&UUID=${UserUUID}&unshaped=${unshaped}`;
+    //     try {
+    //         const data = await this.getData(endpoint);
+    //         console.log('Response Roles for all tenantsssss:', data);
+    //         return data;
+    //     } catch (error) {
+    //         console.error('Error fetching all roles :', error);
+    //         throw error;
+    //     }
+    // }
+    async getTenant(entityName, UserUUID, unshaped) {
+        let unshapedTemp;
+        if (unshaped === false) {
+            unshapedTemp = false;
+        } else {
+            unshapedTemp = true;
+        }
+        const endpoint = `/get_tenants?entity_name=${entityName}&UUID=${UserUUID}&unshaped=${unshaped}`;
+        try {
+            const data = await this.getData(endpoint);
+            console.log('Response Roles for all tenantsssss:', data.instances);
+
+            // Return only the tenants array from the instances property
+            const tenants = data.instances[0]?.tenants || [];
+            console.log('Tenants:', tenants);
+
+            return tenants;
+        } catch (error) {
+            console.error('Error fetching all roles:', error);
+            throw error;
+        }
+    }
+    async getFrontendJobsById(jobId, entityName) {
+        try {
+            console.log('Job id', jobId);
+            // const endpoint = `/dashboard_job_byid?entity_name=${entityName}&UUID=${jobId}`;
+            const endpoint = `/dashboard_job_byid?entity_name=${entityName}&UUID=${jobId}`;
+
+            console.log('Endpoint for jobs:', endpoint);
+            const data = await this.getData(endpoint);
+            console.log('Respons job countfor device id:', data);
+            return data;
+        } catch (error) {
+            console.error('Error fetching jobs by device IDs:', error);
+            throw error;
+        }
+    }
+
+    // get jobs count
+    async getJobsByDeviceId(entityName, deviceIds) {
+        try {
+            const endpoint = `/jobs_by_device?entity_name=${entityName}&device_ids=${deviceIds.join(',')}`;
+            console.log('Endpoint:', endpoint);
+            const data = await this.getData(endpoint);
+            console.log('Response data for job count:', data.jobs);
+            return data.jobs.count;
+        } catch (error) {
+            console.error('Error fetching jobs by device IDs:', error);
+            throw error;
+        }
+    }
+
+    async getRoles(entityName, unshaped) {
+        let unshapedTemp;
+        if (unshaped === false) {
+            unshapedTemp = false;
+        } else {
+            unshapedTemp = true;
+        }
+        const endpoint = `/get_roles?entity_name=${entityName}&unshaped=${unshaped}`;
+
+        try {
+            const data = await this.getData(endpoint);
+            // console.log('Response Roles for all :', data);
+            return data;
+        } catch (error) {
+            console.error('Error fetching all roles :', error);
+            throw error;
+        }
+    }
+    async getRoleName(entityName, roleUUID, unshaped) {
+        let unshapedTemp;
+        if (unshaped === false) {
+            unshapedTemp = false;
+        } else {
+            unshapedTemp = true;
+        }
+        const endpoint = `/get_role_name?entity_name=${entityName}&UUID=${roleUUID}&unshaped=${unshapedTemp}`;
+
+        try {
+            const data = await this.getData(endpoint);
+            // console.log('Response Role name for all :', data);
+            return data;
+        } catch (error) {
+            console.error('Error fetching role name:', error);
+            throw error;
         }
     }
 
@@ -217,9 +495,37 @@ class DataLoaderService extends AbstractDataLoaderService {
             });
     }
 
+    async getSelectedTenantDetails(tenantUUID) {
+        const endpoint = `/tenants_details?UUID=${tenantUUID}`;
+        const token = serviceFactoryInstance.authService.getAuthToken();
+        const sessionID = serviceFactoryInstance.authService.getSessionID();
+        const requestOptions = {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + token,
+                Session: sessionID
+            }
+        };
+
+        try {
+            const response = await fetch(`${config.nodeURL}${endpoint}`, requestOptions);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log(data);
+            return data;
+        } catch (error) {
+            console.error('Error fetching tenant details:', error);
+            throw error;
+        }
+    }
+
     async getFieldValues(entity_name, field) {
         const endpoint = `/get_field_values?entity_name=${entity_name}&field=${field}`;
-        console.log(endpoint);
         const token = serviceFactoryInstance.authService.getAuthToken();
         const sessionID = serviceFactoryInstance.authService.getSessionID();
         const requestOptions = {
@@ -251,7 +557,8 @@ class DataLoaderService extends AbstractDataLoaderService {
         findBy,
         value,
         direction,
-        unshaped
+        unshaped,
+        tenant
     ) {
         var url = `/get_filtered_and_sorted_instances?entity_name=${entity_name}&unshaped=${unshaped}`;
 
@@ -265,6 +572,10 @@ class DataLoaderService extends AbstractDataLoaderService {
 
         if (sort_by) {
             url = `${url}&sort_direction=${sort_direction}&sort_by=${sort_by}`;
+        }
+
+        if (tenant !== undefined) {
+            url = `${url}&tenant=${tenant.UUID}`;
         }
 
         const token = serviceFactoryInstance.authService.getAuthToken();
@@ -306,6 +617,33 @@ class DataLoaderService extends AbstractDataLoaderService {
         };
 
         return fetch(`${config.nodeURL}/add_instance`, requestOptions)
+            .then((response) => response.json())
+            .then((data) => {
+                return data;
+            })
+            .catch((reason) => {
+                this.cache.setNetworkAccessFailedTrue();
+                return reason;
+            });
+    }
+
+    async addJob(entityName, instance) {
+        const token = serviceFactoryInstance.authService.getAuthToken();
+        const sessionID = serviceFactoryInstance.authService.getSessionID();
+        const requestOptions = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + token,
+                Session: sessionID
+            },
+            body: JSON.stringify({
+                entity_name: entityName,
+                payload: { ...instance }
+            })
+        };
+
+        return fetch(`${config.nodeURL}/add_job`, requestOptions)
             .then((response) => response.json())
             .then((data) => {
                 return data;
@@ -465,19 +803,10 @@ class DataLoaderService extends AbstractDataLoaderService {
             url = `${url}&noOfInstances=${entity.noOfInstances}&startOfInstances=${entity.startOfInstances}`;
         }
 
-        if (entity.tenant !== undefined && entity.tenant.UUID !== 0 && entity.filterField === undefined) {
-            const findBy = '["tenant_id"]';
-            const value = `["${entity.tenant.UUID}"]`;
-            const direction = '["0"]';
-            url = `${url}&findBy=${findBy}&value=${value}&direction=${direction}`;
+        if (entity.tenant !== undefined) {
+            url = `${url}&tenant=${entity.tenant.UUID}`;
         }
-        if (entity.tenant !== undefined && entity.tenant.UUID !== 0 && entity.filterField !== undefined) {
-            const findBy = `["tenant_id","${entity.filterField}"]`;
-            const value = `["${entity.tenant.UUID}","${entity.filterValue}"]`;
-            const direction = '["0","0"]';
-            url = `${url}&findBy=${findBy}&value=${value}&direction=${direction}`;
-        }
-        if ((entity.tenant === undefined || entity.tenant.UUID === 0) && entity.filterField !== undefined) {
+        if (entity.filterField !== undefined) {
             const findBy = `["${entity.filterField}"]`;
             const value = `["${entity.filterValue}"]`;
             const direction = '["0"]';
@@ -492,7 +821,6 @@ class DataLoaderService extends AbstractDataLoaderService {
             url = `${url}&sort_direction=${entity.sortDirection}&sort_by=${entity.sortField}`;
         }
 
-        console.log(url);
         return fetch(url, requestOptions)
             .then((response) => response.json())
             .then((data) => {
@@ -511,6 +839,101 @@ class DataLoaderService extends AbstractDataLoaderService {
                 this.cache.setNetworkAccessFailedTrue();
                 return cb([]);
             });
+    }
+
+    async validateOldPassword(UUID, pwd) {
+        const requestOptions = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                UUID: UUID,
+                pwd: pwd
+            })
+        };
+
+        try {
+            const response = await fetch(`${config.nodeURL}/validatePassword`, requestOptions);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.status !== undefined) {
+                return data.status; // Assuming the status field indicates the validity
+            } else {
+                console.error('Invalid response format:', data);
+                return false;
+            }
+        } catch (error) {
+            console.error('Error validating old password:', error);
+            return false;
+        }
+    }
+
+    async getJobDetailsByDeviceIds(entityName, deviceIds) {
+        const endpoint = `/jobs_details_by_device_ids`; // Update the endpoint based on your API
+        const token = serviceFactoryInstance.authService.getAuthToken();
+        const sessionID = serviceFactoryInstance.authService.getSessionID();
+
+        const requestOptions = {
+            method: 'POST', // Assuming your API supports POST method for fetching job details
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + token,
+                Session: sessionID
+            },
+            body: JSON.stringify({ entityName, deviceIds })
+        };
+
+        try {
+            const response = await fetch(`${config.nodeURL}${endpoint}`, requestOptions);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('F data', data);
+            return data;
+        } catch (error) {
+            console.error('Error fetching job details:', error);
+            throw error;
+        }
+    }
+
+    async getAllJobDetails(entityName) {
+        const endpoint = `/jobs_details_by_device_All`; // Update the endpoint based on your API
+        const token = serviceFactoryInstance.authService.getAuthToken();
+        const sessionID = serviceFactoryInstance.authService.getSessionID();
+
+        const requestOptions = {
+            method: 'POST', // Assuming your API supports POST method for fetching job details
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + token,
+                Session: sessionID
+            },
+            body: JSON.stringify({ entityName })
+        };
+
+        try {
+            const response = await fetch(`${config.nodeURL}${endpoint}`, requestOptions);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('jobs', data);
+            return data;
+        } catch (error) {
+            console.error('Error fetching job all details:', error);
+            throw error;
+        }
     }
 }
 

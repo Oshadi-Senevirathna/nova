@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import serviceFactoryInstance from 'framework/services/service-factory';
 // material-ui
 import {
@@ -24,11 +25,19 @@ import { EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 
 // ============================|| FIREBASE - LOGIN ||============================ //
 
-const AuthResetPassword = () => {
+const AuthResetPassword = (title) => {
+    const location = useLocation();
+
+    useEffect(() => {
+        const resetCode = 'test_reset_code'; // Replace with an actual reset code
+        console.log('Reset Code:', resetCode);
+        // Existing code...
+    }, []);
+
     const [showPassword, setShowPassword] = React.useState(false);
     const [showRePassword, setShowRePassword] = React.useState(false);
     const [passwordReset, setShowPasswordReset] = React.useState(false);
-    const location = useLocation();
+
     const handleClickShowPassword = () => {
         setShowPassword(!showPassword);
     };
@@ -62,6 +71,7 @@ const AuthResetPassword = () => {
                         setErrors({ submit: 'Passwords do not match' });
                     } else {
                         const code = location.search.split('?code=')[1];
+                        console.log('Reset Password Code:', code);
                         serviceFactoryInstance.authService.resetPassword(values.password, code, (data) => {
                             if (data.status) {
                                 setShowPasswordReset(true);
@@ -69,6 +79,7 @@ const AuthResetPassword = () => {
                                 setErrors({ submit: data.reason });
                             }
                         });
+
                         try {
                             setStatus({ success: false });
                             setSubmitting(false);

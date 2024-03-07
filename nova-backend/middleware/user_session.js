@@ -5,18 +5,14 @@ async function userSessionCreate(user) {
   const newId = v4();
 
   try {
-    const sessionTimeout = await dbAccess.db
-      .collection("settings")
-      .findOne({
-        category: "session settings",
-        instance_name: "session_timeout",
-      });
-    const maximumSessions = await dbAccess.db
-      .collection("settings")
-      .findOne({
-        category: "session settings",
-        instance_name: "maximum_sessions",
-      });
+    const sessionTimeout = await dbAccess.db.collection("settings").findOne({
+      category: "session settings",
+      instance_name: "session_timeout",
+    });
+    const maximumSessions = await dbAccess.db.collection("settings").findOne({
+      category: "session settings",
+      instance_name: "maximum_sessions",
+    });
 
     const sessions = [];
     const sessionsCursor = dbAccess.db
@@ -46,7 +42,7 @@ async function userSessionCreate(user) {
 
     const payload = {};
     payload["session_id"] = newId;
-    payload["user"] = user;
+    payload["created_by"] = user;
     payload["session_start"] = date;
     payload["session_last_updated"] = date;
     payload["session_closed"] = false;
@@ -64,12 +60,10 @@ async function userSessionUpdate(session_id) {
   const date = Date.now();
 
   try {
-    const sessionTimeout = await dbAccess.db
-      .collection("settings")
-      .findOne({
-        category: "session settings",
-        instance_name: "session_timeout",
-      });
+    const sessionTimeout = await dbAccess.db.collection("settings").findOne({
+      category: "session settings",
+      instance_name: "session_timeout",
+    });
     var payload = await dbAccess.db
       .collection("user_session")
       .findOne({ session_id: session_id });

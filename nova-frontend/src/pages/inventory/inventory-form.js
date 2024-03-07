@@ -65,7 +65,14 @@ const InventoryForm = ({ formOpen, closeForm, UUID, setSuccessSnackbarMessage, s
                         initialValues={initialValues}
                         validationSchema={Yup.object().shape({
                             instance_name: Yup.string().required('Hostname is required'),
-                            ip_address: Yup.string().required('IP Address is required'),
+                            // ip_address: Yup.string().required('IP Address is required'),
+                            ip_address: Yup.string()
+                                .required('IP Address is required')
+                                .matches(
+                                    // Regular expression for validating IP addresses
+                                    /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/,
+                                    'Invalid IP Address format'
+                                ),
                             mac_address: Yup.string().required('MAC Address is required'),
                             tenant: Yup.string().required('Tenant is required')
                         })}
@@ -178,7 +185,9 @@ const InventoryForm = ({ formOpen, closeForm, UUID, setSuccessSnackbarMessage, s
                                     </Grid>
                                     <Grid item xs={12}>
                                         <Stack spacing={1}>
-                                            <InputLabel htmlFor="inventory-form-tenant">Tenant</InputLabel>
+                                            <InputLabel htmlFor="inventory-form-tenant" error={Boolean(touched.tenant && errors.tenant)}>
+                                                Tenant
+                                            </InputLabel>
                                             <Select
                                                 id="inventory-form-tenant"
                                                 type="text"
@@ -201,8 +210,8 @@ const InventoryForm = ({ formOpen, closeForm, UUID, setSuccessSnackbarMessage, s
                                                       )
                                                     : ''}
                                             </Select>
-                                            {touched.tenant && errors.tenant && (
-                                                <FormHelperText error id="standard-weight-helper-text-inventory-form-tenant">
+                                            {touched.instance_name && errors.instance_name && (
+                                                <FormHelperText error id="standard-weight-helper-text-inventory-form-instance_name">
                                                     {errors.tenant}
                                                 </FormHelperText>
                                             )}

@@ -2,12 +2,11 @@ import { makeStyles } from '../../../node_modules/@mui/styles/index';
 import { Button } from '@mui/material';
 import { ENTITY_NAME_TENANT } from 'framework/caching/entity-cache';
 import serviceFactoryInstance from 'framework/services/service-factory';
-import MUIDataTable from 'mui-datatables';
 import { useEffect, useState } from 'react';
-import ConfirmationDialog from 'components/styledMUI/confirmation-dialog';
 import configs from './tenant-config.json';
 import TenantForm from './tenant-form';
 import CustomSnackbar from 'components/styledMUI/Snackbar';
+import CustomDatatable from 'components/styledMUI/Datatable';
 
 const useStyles = makeStyles((theme) => ({
     root: {
@@ -35,15 +34,8 @@ const useStyles = makeStyles((theme) => ({
 
 const InventoryPage = ({ title }) => {
     const classes = useStyles();
-    const [tenants, setTenants] = useState([]);
     const [UUID, setUUID] = useState();
     const [formOpen, setFormOpen] = useState(false);
-    const [deleteUUIDS, setDeleteUUIDS] = useState([]);
-    const [confirmDeleteForm, setConfirmDeleteForm] = useState(false);
-    const [noOfInstances, setNoOfInstances] = useState(10);
-    const [startOfInstances, setStartOfInstances] = useState(0);
-    const [tenantsCount, setTenantsCount] = useState(0);
-    const [page, setPage] = useState(0);
     const [errorSnackbarMessage, setErrorSnackbarMessage] = useState('');
     const [successSnackbarMessage, setSuccessSnackbarMessage] = useState('');
 
@@ -52,32 +44,6 @@ const InventoryPage = ({ title }) => {
     }, []);
 
     var configReshaped = configs;
-
-    useEffect(() => {
-        const tenantsSub = serviceFactoryInstance.dataLoaderService
-            .dataSub(ENTITY_NAME_TENANT, undefined, noOfInstances, startOfInstances)
-            .subscribe((data) => {
-                if (data) {
-                    setTenants(data);
-                }
-            });
-
-        return () => {
-            tenantsSub.unsubscribe();
-        };
-    }, [serviceFactoryInstance.cache, noOfInstances, startOfInstances]);
-
-    useEffect(() => {
-        const tenantsCountSub = serviceFactoryInstance.dataLoaderService.countSub(ENTITY_NAME_TENANT).subscribe((data) => {
-            if (data) {
-                setTenantsCount(data);
-            }
-        });
-
-        return () => {
-            tenantsCountSub.unsubscribe();
-        };
-    }, [serviceFactoryInstance.cache]);
 
     const closeForm = () => {
         setUUID();
@@ -106,61 +72,18 @@ const InventoryPage = ({ title }) => {
         }
     };
 
-    const handleDeleteOK = () => {
-        deleteData(deleteUUIDS);
-        setConfirmDeleteForm(false);
-    };
-
-    const handleDeleteCancel = () => {
-        setConfirmDeleteForm(false);
-    };
-
-    const options = {
-        onRowsDelete: (rowsDeleted, dataRows) => {
-            const rowsDeleteUUIDS = [];
-            for (let i = 0; i < rowsDeleted.data.length; i++) {
-                rowsDeleteUUIDS.push(tenants[rowsDeleted.data[i].dataIndex].UUID);
-            }
-            setDeleteUUIDS(rowsDeleteUUIDS);
-            setConfirmDeleteForm(true);
-        },
-        onRowClick: (rowData, rowMeta) => {
-            setUUID(tenants[rowMeta.dataIndex].UUID);
-            openForm();
-        },
-        count: tenantsCount,
-        rowsPerPage: 10,
-        rowsPerPageOptions: [10, 25, 50],
-        serverSide: true,
-        page: page,
-        filter: false,
-        onChangePage(currentPage) {
-            setPage(currentPage);
-            setStartOfInstances(currentPage * noOfInstances);
-        },
-        onChangeRowsPerPage(numberOfRows) {
-            setPage(0);
-            setStartOfInstances(0);
-            setNoOfInstances(numberOfRows);
-        }
-    };
-
     return (
         <div className={classes.root}>
-            <ConfirmationDialog
-                open={confirmDeleteForm}
-                title="Delete Confirmation"
-                message={
-                    (deleteUUIDS.length > 1 && `Are you sure you want to delete the tenant?`) ||
-                    (deleteUUIDS.length === 1 && `Are you sure you want to delete the tenant?`)
-                }
-                onOK={handleDeleteOK}
-                onCancel={handleDeleteCancel}
-            />
             <CustomSnackbar msg={successSnackbarMessage} onClose={() => setSuccessSnackbarMessage('')} severity="success" title="Success" />
             <CustomSnackbar msg={errorSnackbarMessage} onClose={() => setErrorSnackbarMessage('')} severity="error" title="Error" />
+            <CustomDatatable
+                entityName={ENTITY_NAME_TENANT}
+                configs={configReshaped}
+                deleteData={deleteData}
+                setUUID={setUUID}
+                openForm={openForm}
+            />
 
-            <MUIDataTable options={options} data={tenants} columns={configReshaped.fields} />
             <TenantForm
                 formOpen={formOpen}
                 closeForm={closeForm}

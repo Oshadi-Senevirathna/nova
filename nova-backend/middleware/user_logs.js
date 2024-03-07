@@ -11,7 +11,7 @@ async function userLogs(user, action, entity, instance_name, instances) {
 
   payload["UUID"] = newId;
   payload["instance_name"] = newId;
-  payload["user"] = user;
+  payload["created_by"] = user;
   payload["timestamp"] = date;
   payload["collection"] = entity;
   payload["entry_name"] = instance_name;
@@ -21,7 +21,7 @@ async function userLogs(user, action, entity, instance_name, instances) {
     var filterDet = {};
     filterDet["entity_name"] = entity;
 
-    const shape = await dbAccess.zzdb
+    const shape = await dbAccess.db
       .collection("collection_details")
       .findOne(filterDet);
     if (shape) {

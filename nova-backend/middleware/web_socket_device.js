@@ -55,6 +55,7 @@ async function on_web_socket_connect_device(mac, ip, version) {
     const newId = v4();
     payload["UUID"] = newId;
     payload["mac_address"] = approvedMACAdd[0];
+    payload["instance_name"] = approvedMACAdd[0];
     payload["ip_address"] = approvedIPAdd[0];
     payload["os_version"] = version;
     payload["last_active"] = date;
@@ -156,6 +157,7 @@ async function on_web_socket_last_active(mac) {
     if (result.status === true) {
       return {
         status: true,
+        time: date,
         reason: "Updated the device",
       };
     } else {

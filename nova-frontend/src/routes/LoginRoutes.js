@@ -3,6 +3,8 @@ import { lazy } from 'react';
 // project import
 import Loadable from 'components/Loadable';
 import MinimalLayout from 'layout/MinimalLayout';
+import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 
 // render - login
 const AuthLogin = Loadable(lazy(() => import('pages/authentication/Login')));

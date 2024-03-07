@@ -8,6 +8,7 @@ class WebSocketService extends AbstractWebSocketService {
         this.cache = cache;
 
         serviceFactoryInstance.authService.getUserObservable().subscribe((user) => {
+            console.log(user);
             if (user) {
                 this.ws = new WebSocket(`${config.wsUrl}?token=${serviceFactoryInstance.authService.getAuthToken()}`);
                 this.connectWS();
@@ -25,10 +26,12 @@ class WebSocketService extends AbstractWebSocketService {
             this.connectWS();
             await timer(15000); // then the created Promise can be awaited
         }
+        console.log('websocket logout');
         serviceFactoryInstance.authService.logout();
     }
 
     connectWS() {
+        console.log('connecting');
         this.ws.onopen = () => console.log('Websocket opened');
         this.ws.onclose = () => {
             console.log('Websocket closed. Attempting re-connect');

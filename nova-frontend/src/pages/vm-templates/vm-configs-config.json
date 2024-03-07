@@ -4,11 +4,22 @@
     "multiple": "vm configs",
     "fields": [
         {
+            "name": "vm_template_id",
+            "numeric": false,
+            "label": "VNF Template ID",
+            "options": {
+                "filter": true,
+                "display": false,
+                "sort": false,
+                "viewColumns": false
+            }
+        },
+        {
             "name": "vm_image_id",
             "numeric": false,
             "label": "VNF Image Name",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         },
@@ -17,7 +28,7 @@
             "numeric": false,
             "label": "Memory(MB)",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         },
@@ -26,7 +37,7 @@
             "numeric": false,
             "label": "vCPU",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         }

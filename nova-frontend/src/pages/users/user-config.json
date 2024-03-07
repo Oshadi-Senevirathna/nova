@@ -1,14 +1,14 @@
 {
-    "name": "Job",
-    "single": "job",
-    "multiple": "jobs",
+    "name": "User",
+    "single": "user",
+    "multiple": "users",
     "fields": [
         {
             "name": "instance_name",
             "numeric": false,
             "label": "Username",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         },
@@ -17,7 +17,7 @@
             "numeric": false,
             "label": "Email Address",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         },
@@ -26,7 +26,7 @@
             "numeric": false,
             "label": "First Name",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         },
@@ -35,7 +35,7 @@
             "numeric": false,
             "label": "Last Name",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         }

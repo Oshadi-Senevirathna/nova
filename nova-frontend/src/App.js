@@ -7,8 +7,8 @@ import serviceFactoryInstance from 'framework/services/service-factory';
 // ==============================|| APP - THEME, ROUTER, LOCAL  ||============================== //
 
 const App = () => {
-    const serviceFactory = serviceFactoryInstance;
-    serviceFactory.init();
+    serviceFactoryInstance.init();
+
     return (
         <ThemeCustomization>
             <ScrollTop>

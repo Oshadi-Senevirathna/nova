@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import serviceFactoryInstance from 'framework/services/service-factory';
 
@@ -56,21 +56,33 @@ function a11yProps(index) {
 // ==============================|| HEADER CONTENT - PROFILE ||============================== //
 
 const Profile = () => {
+    const [userName, setUserName] = useState('');
+    const [userInitials, setUserInitials] = useState('');
+    const [userEmail, setUserEmail] = useState('');
+    const [open, setOpen] = useState(false);
+    const [value, setValue] = useState(0);
+
+    const anchorRef = useRef(null);
     const theme = useTheme();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        serviceFactoryInstance.authService.getUserObservable().subscribe((user) => {
+            if (user) {
+                setUserName(`${user.first_name} ${user.last_name} `);
+                setUserInitials(`${user.first_name[0]} ${user.last_name[0]} `);
+                setUserEmail(`${user.email}`);
+            }
+        });
+    });
+
     const handleLogout = async () => {
         serviceFactoryInstance.authService.logout();
     };
     const handleViewProfile = async () => {
-        navigate(`/users/details/${serviceFactoryInstance.authService.currentUser.instance_name}`);
+        navigate(`/users/details/${serviceFactoryInstance.authService.currentUser.UUID}`);
     };
 
-    const userName = `${serviceFactoryInstance.authService.currentUser.first_name} ${serviceFactoryInstance.authService.currentUser.last_name} `;
-    const userInitials = `${serviceFactoryInstance.authService.currentUser.first_name[0]} ${serviceFactoryInstance.authService.currentUser.last_name[0]} `;
-    const userEmail = `${serviceFactoryInstance.authService.currentUser.email}`;
-
-    const anchorRef = useRef(null);
-    const [open, setOpen] = useState(false);
     const handleToggle = () => {
         setOpen((prevOpen) => !prevOpen);
     };
@@ -81,8 +93,6 @@ const Profile = () => {
         }
         setOpen(false);
     };
-
-    const [value, setValue] = useState(0);
 
     const handleChange = (event, newValue) => {
         setValue(newValue);
@@ -108,12 +118,6 @@ const Profile = () => {
         /* eslint-enable no-bitwise */
 
         return color;
-    }
-
-    function stringAvatar(name) {
-        return {
-            children: `${name.split(' ')[0][0]}${name.split(' ')[1][0]}`
-        };
     }
 
     return (

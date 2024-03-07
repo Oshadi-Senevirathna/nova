@@ -29,6 +29,10 @@ app.use(bodyParser.json({ limit: "30mb", extended: true }));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 app.use(cors());
+app.use(function (req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  next();
+});
 
 app.use("/", authRoute);
 app.use("/", dataLoaderRoute);
@@ -82,6 +86,7 @@ wss.on("connection", (socket) => {
   socket.on("message", (msg) => {
     const [client, data] = msg.split("-");
     if (client === "device") {
+      console.log("device update");
       on_web_socket_last_active(data);
     }
   });

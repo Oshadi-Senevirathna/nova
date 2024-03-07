@@ -1,21 +1,13 @@
 let express = require("express");
-let { v4 } = require("uuid");
-let nacl = require("tweetnacl");
-let util = require("tweetnacl-util");
 let dotenv = require("dotenv");
-let FormData = require("form-data");
 let multer = require("multer");
 
 let dbAccess = require("../db_access/db_access.js");
-let { get_user_from_jwt_token } = require("../middleware/auth.js");
-let check_privilege = require("../middleware/check_privilege.js");
 let { userSessionUpdate } = require("../middleware/user_session.js");
 let userLogs = require("../middleware/user_logs.js");
 let { on_data_update } = require("../middleware/web_socket.js");
 let verify_session_user_privilege = require("../middleware/verify_session_user_privilege.js");
-let formidable = require("formidable");
 let fs = require("fs");
-let http = require("http");
 
 dotenv.config();
 const storageVMImage = multer.diskStorage({
@@ -50,7 +42,7 @@ router.post(
       req.header("Session"),
       req.header("Authorization"),
       entityName,
-      "edit"
+      true
     );
     if (!validation.status) {
       return res.status(validation.errorCode).json({
@@ -60,7 +52,6 @@ router.post(
     }
 
     try {
-      res.set("access-control-allow-origin", "*");
       res.status(200).json({
         status: true,
         instance: { filename: payload.originalname, ...payload },
@@ -86,7 +77,7 @@ router.get("/check_upload_file_to_server", async (req, res) => {
     req.header("Session"),
     req.header("Authorization"),
     entityName,
-    "edit"
+    true
   );
 
   if (!validation.status) {
@@ -97,8 +88,6 @@ router.get("/check_upload_file_to_server", async (req, res) => {
   }
 
   try {
-    res.set("access-control-allow-origin", "*");
-
     const image = await dbAccess.getInstance(entityName, "filename", fileName);
 
     if (image.instance) {
@@ -131,7 +120,7 @@ router.post("/change_file_name", async (req, res) => {
     req.header("Session"),
     req.header("Authorization"),
     entityName,
-    "edit"
+    true
   );
   if (!validation.status) {
     return res.status(validation.errorCode).json({
@@ -203,7 +192,7 @@ router.post("/change_file_name", async (req, res) => {
     on_data_update(msg);
 
     userSessionUpdate(req.header("Session"));
-    res.set("access-control-allow-origin", "*");
+
     res.status(200).json({
       status: true,
       reason: "Updated file",
@@ -228,7 +217,7 @@ router.post("/delete_file", async (req, res) => {
     req.header("Session"),
     req.header("Authorization"),
     entityName,
-    "edit"
+    true
   );
   if (!validation.status) {
     return res.status(validation.errorCode).json({
@@ -314,8 +303,6 @@ router.get("/download_file", async (req, res) => {
   console.log(`Download file in ${entityName}`);
 
   try {
-    res.set("access-control-allow-origin", "*");
-
     const data = await dbAccess.getInstance(entityName, "UUID", UUID, true);
     var file = data.instance;
     if (!file) {
@@ -324,7 +311,6 @@ router.get("/download_file", async (req, res) => {
         reason: "File not found in the system",
       });
     }
-    console.log(file);
 
     const source = file["path"];
     const folderPath = source.split("\\").slice(0, -1).join("\\");

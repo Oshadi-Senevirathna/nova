@@ -8,7 +8,7 @@
             "numeric": false,
             "label": "VNF Name",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             },
             "formFillRequired": true
@@ -18,7 +18,7 @@
             "numeric": false,
             "label": "Category",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             },
             "formFillRequired": true
@@ -28,7 +28,7 @@
             "numeric": false,
             "label": "Filename",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             },
             "formFillRequired": true
@@ -38,7 +38,7 @@
             "numeric": false,
             "label": "Uploaded by",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             },
             "formFillRequired": true

@@ -6,9 +6,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Outlet } from 'react-router-dom';
 import { openDrawer } from 'store/reducers/menu';
 
+import menuItem from 'layout/menu-items/index';
 import navigation from '../menu-items';
 import Drawer from './Drawer';
 import Header from './Header';
+import serviceFactoryInstance from 'framework/services/service-factory';
 
 // ==============================|| MAIN LAYOUT ||============================== //
 
@@ -39,13 +41,32 @@ const MainLayout = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [drawerOpen]);
 
+    const [privileges, setPrivileges] = useState([]);
+    useEffect(() => {
+        serviceFactoryInstance.authService.getUserObservable().subscribe((user) => {
+            if (!user) {
+                setPrivileges([]);
+            } else {
+                setPrivileges(user.privileges);
+            }
+        });
+    }, []);
+
+    const filteredMenuItems = () => {
+        return {
+            items: menuItem.items.filter((item) => {
+                return serviceFactoryInstance.authService.hasPrivilege(item.privilege) || !item.privilege;
+            })
+        };
+    };
+
     return (
         <Box sx={{ display: 'flex', width: '100%' }}>
             <Header open={open} handleDrawerToggle={handleDrawerToggle} />
             <Drawer open={open} handleDrawerToggle={handleDrawerToggle} />
             <Box component="main" sx={{ width: '100%', flexGrow: 1, p: { xs: 2, sm: 3 } }}>
                 <Toolbar />
-                <Breadcrumbs navigation={navigation} divider={false} />
+                <Breadcrumbs navigation={filteredMenuItems()} divider={false} />
                 <Outlet />
             </Box>
         </Box>
