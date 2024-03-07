@@ -22,7 +22,9 @@ const CustomDatatable = ({
     summary,
     filter,
     navigateToPage,
-    presetFilterValue
+    presetFilterValue,
+    initSortField,
+    initSortDirection
 }) => {
     const [confirmDeleteForm, setConfirmDeleteForm] = useState(false);
     const [deleteUUIDS, setDeleteUUIDS] = useState([]);
@@ -32,22 +34,26 @@ const CustomDatatable = ({
     const [page, setPage] = useState(0);
     const [data, setData] = useState([]);
     const [queryString, setQueryString] = useState('');
-    const [queryStringTemp, setQueryStringTemp] = useState('');
     const [filterField, setFilterField] = useState();
     const [filterValues, setFilterValues] = useState();
     const [filterValue, setFilterValue] = useState();
-    const [sortField, setSortField] = useState();
-    const [sortDirection, setSortDirection] = useState();
+    const [sortField, setSortField] = useState(initSortField ? initSortField : undefined);
+    const [sortDirection, setSortDirection] = useState(initSortDirection ? initSortDirection : undefined);
     const [downloadData, setDownloadData] = useState([]);
     const downloadConfigs = [];
     const fields = [];
 
     for (let i = 0; i < configs.fields.length; i++) {
-        fields.push(`"${configs.fields[i].name}"`);
-        downloadConfigs.push({ ...configs.fields[i], key: configs.fields[i].name });
+        if (configs.fields[i].options && (configs.fields[i].options.display === undefined || configs.fields[i].options.display !== false)) {
+            fields.push(`"${configs.fields[i].name}"`);
+            downloadConfigs.push({ ...configs.fields[i], key: configs.fields[i].name });
+        }
     }
 
     useEffect(() => {
+        if (presetFilterValue) {
+            setFilterValue(presetFilterValue);
+        }
         for (let i = 0; i < configs.fields.length; i++) {
             if (configs.fields[i].options && configs.fields[i].options.filter === true) {
                 setFilterField(configs.fields[i]);
@@ -56,7 +62,7 @@ const CustomDatatable = ({
     }, []);
 
     useEffect(() => {
-        if (filterField) {
+        if (filterField && filter) {
             serviceFactoryInstance.dataLoaderService.getFieldValues(entityName, filterField.name).then((data) => {
                 var temp = [...data.instances];
                 temp.push('All');
@@ -77,7 +83,7 @@ const CustomDatatable = ({
                 sortField,
                 sortDirection,
                 filterField && filterValue !== 'All' ? filterField.name : undefined,
-                filterValue && filterValue !== 'All' && !presetFilterValue ? filterValue : presetFilterValue ? presetFilterValue : undefined
+                filterValue && filterValue !== 'All' ? filterValue : undefined
             )
             .subscribe((data) => {
                 if (data) {
@@ -88,7 +94,17 @@ const CustomDatatable = ({
         return () => {
             dataSub.unsubscribe();
         };
-    }, [serviceFactoryInstance.cache, noOfInstances, startOfInstances, tenant, queryString, sortField, sortDirection, filterValue]);
+    }, [
+        serviceFactoryInstance.cache,
+        noOfInstances,
+        startOfInstances,
+        tenant,
+        queryString,
+        sortField,
+        sortDirection,
+        filterValue,
+        filterField
+    ]);
 
     useEffect(() => {
         const dataCountSub = serviceFactoryInstance.dataLoaderService.countSub(entityName).subscribe((data) => {
@@ -194,12 +210,14 @@ const CustomDatatable = ({
     const options = {
         customToolbar: CustomToolbar,
         onRowsDelete: (rowsDeleted, dataRows) => {
-            const rowsDeleteUUIDS = [];
-            for (let i = 0; i < rowsDeleted.data.length; i++) {
-                rowsDeleteUUIDS.push(data[rowsDeleted.data[i].dataIndex].UUID);
+            if (deleteData) {
+                const rowsDeleteUUIDS = [];
+                for (let i = 0; i < rowsDeleted.data.length; i++) {
+                    rowsDeleteUUIDS.push(data[rowsDeleted.data[i].dataIndex].UUID);
+                }
+                setDeleteUUIDS(rowsDeleteUUIDS);
+                setConfirmDeleteForm(true);
             }
-            setDeleteUUIDS(rowsDeleteUUIDS);
-            setConfirmDeleteForm(true);
         },
         onRowClick: (rowData, rowMeta) => {
             if (openForm && setUUID) {
@@ -228,11 +246,32 @@ const CustomDatatable = ({
         },
         filter: false,
         onDownload: (buildHead, buildBody, columns, data) => {
-            const findBy = tenant ? '["tenant_id"]' : undefined;
-            const value = tenant ? `["${tenant.UUID}"]` : undefined;
-            const direction = tenant ? '["0"]' : undefined;
+            let findBy;
+            let value;
+            let direction;
+            if (presetFilterValue && filterField && tenant) {
+                findBy = `["tenant_id","${filterField.name}"]`;
+                value = `["${tenant.UUID}","${presetFilterValue}"]`;
+                direction = '["0","0"]';
+            } else if (presetFilterValue && filterField) {
+                findBy = `["${filterField.name}"]`;
+                value = `["${presetFilterValue}"]`;
+                direction = '["0"]';
+            }
+
             serviceFactoryInstance.dataLoaderService
-                .getFilteredAndSortedInstances(entityName, queryString, fields, sortField, sortDirection, findBy, value, direction, false)
+                .getFilteredAndSortedInstances(
+                    entityName,
+                    queryString,
+                    fields,
+                    sortField,
+                    sortDirection,
+                    findBy,
+                    value,
+                    direction,
+                    false,
+                    tenant
+                )
                 .then((data) => {
                     setDownloadData(data.instances);
                     const link = document.getElementById('download-link');

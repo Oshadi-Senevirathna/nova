@@ -8,7 +8,7 @@
             "numeric": false,
             "label": "Template Name",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         }

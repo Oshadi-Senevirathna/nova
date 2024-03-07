@@ -5,12 +5,10 @@ let nodemailer = require("nodemailer");
 let { v4 } = require("uuid");
 
 let {
-  get_user_from_jwt_token,
   get_user_from_jwt_token_reset_pwd,
   check_policy,
 } = require("../middleware/auth.js");
 let dbAccess = require("../db_access/db_access.js");
-let check_privilege = require("../middleware/check_privilege.js");
 let userLogs = require("../middleware/user_logs.js");
 let {
   userSessionCreate,
@@ -21,37 +19,37 @@ let { on_data_update } = require("../middleware/web_socket.js");
 let verify_session_user_privilege = require("../middleware/verify_session_user_privilege.js");
 
 const router = express.Router();
+const { ObjectId } = require("mongodb");
+const { CLOSING } = require("ws");
 const USER_COLLECTION = "users";
+
 const SETTINGS_COLLECTION = "settings";
 const SETTINGS_CATEGORY = "category";
 const SETTINGS_EMAIL_SETTINGS = "email settings";
 
 router.post("/authenticate", async (req, res) => {
   const request_data = req.body;
-  if (!request_data.username || !request_data.pwd)
+  if (!request_data.email || !request_data.pwd)
     return res.status(400).json({
       status: false,
       reason: "Not all fields have been entered",
     });
 
-  console.log(
-    `User authentication request recieved for ${request_data.username}`
-  );
+  console.log(`User authentication request recieved for ${request_data.email}`);
 
   try {
     const data = await dbAccess.getInstance(
       USER_COLLECTION,
-      "instance_name",
-      request_data.username,
+      "email",
+      request_data.email,
       true
     );
     var user = data.instance;
-    console.log(user);
-
+    console.log("Usercame", user);
     if (!user) {
       return res.status(400).json({
         status: false,
-        reason: "Invalid username",
+        reason: "Invalid email",
       });
     }
 
@@ -61,6 +59,7 @@ router.post("/authenticate", async (req, res) => {
       "password_retries_window",
       true
     );
+    console.log("Came 1");
     const window = parseFloat(dataWindow.instance.value);
     const dataLockout = await dbAccess.getInstance(
       SETTINGS_COLLECTION,
@@ -68,6 +67,7 @@ router.post("/authenticate", async (req, res) => {
       "password_lockout_time",
       true
     );
+    console.log("Came 2");
     const lockout = parseFloat(dataLockout.instance.value);
     const dataCount = await dbAccess.getInstance(
       SETTINGS_COLLECTION,
@@ -76,21 +76,20 @@ router.post("/authenticate", async (req, res) => {
       true
     );
     const count = parseFloat(dataCount.instance.value);
-    console.log(count);
-
+    console.log("Came 3");
     if (!lockout || !count || !window) {
       return res.status(400).json({
         status: false,
         reason: "Login policies not found",
       });
     }
-
+    console.log("Came 4");
     const date = Date.now();
     const timeout = user.last_login_failure_time
       ? user.last_login_failure_time + window
       : 0;
     const locked = user.locked_time ? user.locked_time : 0;
-
+    console.log("Came 6");
     if (date < locked) {
       return res.status(400).json({
         status: false,
@@ -98,7 +97,7 @@ router.post("/authenticate", async (req, res) => {
           "You exceeded the number of password retries. Please try again in a few minuites",
       });
     }
-
+    console.log("Came 7");
     const isMatch = await bcrypt.compare(request_data.pwd, user.pwd.toString());
     if (!isMatch) {
       if (date > timeout) {
@@ -112,29 +111,30 @@ router.post("/authenticate", async (req, res) => {
           user.last_login_failure_time = date - window;
         }
       }
-      console.log(user);
       await dbAccess.replaceInstance(
         USER_COLLECTION,
-        "instance_name",
-        user.instance_name,
+        "UUID",
+        user.UUID,
         user,
         ""
       );
+
       return res.status(400).json({
         status: false,
         reason: "Invalid password",
       });
     }
-
+    console.log("Came 8");
     user.login_failure_count = 0;
     user.last_login_time = date;
     const results = await dbAccess.replaceInstance(
       USER_COLLECTION,
-      "instance_name",
-      user.instance_name,
+      "UUID",
+      user.UUID,
       user,
       ""
     );
+    console.log("Came 9");
     if (results.status !== true) return res.status(400).json(results);
 
     const token = jwt.sign(
@@ -144,18 +144,79 @@ router.post("/authenticate", async (req, res) => {
         expiresIn: process.env.JWT_SECRET_EXPIRES_IN,
       }
     );
+    console.log("Came 10");
 
     const session = await userSessionCreate(user["instance_name"]);
+    console.log("Came 11");
     if (!session)
       return res.status(400).json({
         status: false,
         reason: "Maximum active sessions exceeded",
       });
+    console.log("Came 12");
+    if (user.instance_name === process.env.SUPER_ADMIN) {
+      console.log("Came 13");
+      const superadminTenantsTemp =
+        await dbAccess.getFilteredAndSortedCollection("tenant");
+      var superadminTenants = superadminTenantsTemp.instances;
+      if (!superadminTenants) {
+        user.tenants = [];
+      } else {
+        user.tenants = superadminTenants;
+      }
+      console.log("Came 14");
+      const superadminPrivilegesTemp =
+        await dbAccess.getFilteredAndSortedCollection("user_privileges");
+      var superadminPrivileges = superadminPrivilegesTemp.instances;
+      superadminPrivileges.push({
+        instance_name: "manage_companies",
+        display_name: "Manage Companies",
+      });
+      console.log("Came 15");
+      if (!superadminPrivileges) {
+        user.privileges = [];
+      } else {
+        user.privileges = superadminPrivileges;
+      }
+    } else {
+      console.log("Came 16");
+      const userRoles = user.roles;
+      var userPrivileges = [];
+      console.log("role", userRoles);
+      console.log("Len", userRoles.length);
+      for (let i = 0; i < userRoles.length; i++) {
+        const userRoleTemp = await dbAccess.getInstance(
+          "user_roles",
+          "UUID",
+          userRoles[i]
+        );
+        console.log("Role", userRoleTemp);
+        if (userRoleTemp.instance.privileges) {
+          for (let j = 0; j < userRoleTemp.instance.privileges.length; j++) {
+            userPrivileges.push(userRoleTemp.instance.privileges[j]);
+          }
+        }
+      }
 
+      
+      const allPrivilegesTemp = await dbAccess.getFilteredAndSortedCollection(
+        "user_privileges"
+      );
+      var allPrivileges = allPrivilegesTemp.instances;
+
+      const userPrivilegesObjects = [];
+      for (let j = 0; j < allPrivileges.length; j++) {
+        if (userPrivileges.indexOf(allPrivileges[j].UUID) > -1) {
+          userPrivilegesObjects.push(allPrivileges[j]);
+        }
+      }
+      console.log("here", userPrivilegesObjects);
+      user.privileges = userPrivilegesObjects;
+    }
     userLogs(user["instance_name"], "User login");
 
     user.pwd = "";
-    res.set("access-control-allow-origin", "*");
+
     res.status(200).json({
       status: true,
       jwt: token,
@@ -169,20 +230,22 @@ router.post("/authenticate", async (req, res) => {
 });
 
 router.post("/logout", async (req, res) => {
-  console.log("Logout user");
-
-  const current_user = get_user_from_jwt_token(req.header("Authorization"));
-  if (!current_user)
-    return res.status(400).json({
+  const validation = await verify_session_user_privilege(
+    req.header("Session"),
+    req.header("Authorization")
+  );
+  if (!validation.status) {
+    return res.status(validation.errorCode).json({
       status: false,
-      reason: "Invalid authorization token",
+      reason: validation.reason,
     });
+  }
+  const current_user = validation.current_user;
 
   try {
     await userSessionClose(req.body.session);
     userLogs(current_user, "User logout");
 
-    res.set("access-control-allow-origin", "*");
     res.status(200).json({
       status: true,
       reason: "",
@@ -192,78 +255,19 @@ router.post("/logout", async (req, res) => {
   }
 });
 
-//have to minimalize from here
-//verify which of these should be kept
-router.get("/user_privileges", async (req, res) => {
-  const validSession = userSessionUpdate(req.header("Session"));
-  if (!validSession)
-    return res.status(400).json({
-      status: false,
-      reason: "Session is terminated",
-    });
-
-  console.log("Request user privileges");
-
-  const current_user = await get_user_from_jwt_token(
-    req.header("Authorization")
+router.post("/verify_user", async (req, res) => {
+  const validation = await verify_session_user_privilege(
+    req.header("Session"),
+    req.header("Authorization"),
+    USER_COLLECTION
   );
-  if (!current_user)
-    return res.status(400).json({
+  if (!validation.status) {
+    return res.status(validation.errorCode).json({
       status: false,
-      reason: "Invalid authorization token",
+      reason: validation.reason,
     });
-  try {
-    const data = await dbAccess.getInstance(
-      USER_COLLECTION,
-      "instance_name",
-      current_user,
-      true
-    );
-    const user = data.instance;
-    if (!user) {
-      return res.status(400).json({
-        status: false,
-        reason: "User not found in the system",
-      });
-    }
-
-    //have to fix this
-    /* const userPrivileges = [];
-    const userRoles = []
-    for (const role of user.roles) {
-      userRoles.push(dbAccess.rolesUUID.get(role))
-      const privileges = dbAccess.roles.get(role)
-      for(const privilege of privileges){
-        userPrivileges.push(privilege) 
-      }
-    } */
-
-    res.set("access-control-allow-origin", "*");
-    res.status(200).json({
-      status: true,
-      instance: { user: user, privileges: [], roles: [] },
-    });
-  } catch (error) {
-    res.status(404).json({ detail: "Error occured when accessing db" });
   }
-});
-
-router.get("/get_roles", async (req, res) => {
-  const validSession = userSessionUpdate(req.header("Session"));
-  if (!validSession)
-    return res.status(400).json({
-      status: false,
-      reason: "Session is terminated",
-    });
-
-  console.log("Request all roles");
-
-  const current_user = get_user_from_jwt_token(req.header("Authorization"));
-  if (!current_user)
-    return res.status(400).json({
-      status: false,
-      reason: "Invalid authorization token",
-    });
+  const current_user = validation.current_user;
 
   try {
     const data = await dbAccess.getInstance(
@@ -280,31 +284,62 @@ router.get("/get_roles", async (req, res) => {
       });
     }
 
-    const isSuperAdmin =
-      user.roles && user.roles.indexOf(dbAccess.superAdmin) > -1;
-    const isAppAdmin = user.roles && user.roles.indexOf(dbAccess.appAdmin) > -1;
+    if (user.instance_name === process.env.SUPER_ADMIN) {
+      const superadminTenantsTemp =
+        await dbAccess.getFilteredAndSortedCollection("tenant");
+      var superadminTenants = superadminTenantsTemp.instances;
+      if (!superadminTenants) {
+        user.tenants = [];
+      } else {
+        user.tenants = superadminTenants;
+      }
+      const superadminPrivilegesTemp =
+        await dbAccess.getFilteredAndSortedCollection("user_privileges");
+      var superadminPrivileges = superadminPrivilegesTemp.instances;
+      superadminPrivileges.push({
+        instance_name: "manage_companies",
+        display_name: "Manage Companies",
+      });
+      if (!superadminPrivileges) {
+        user.privileges = [];
+      } else {
+        user.privileges = superadminPrivileges;
+      }
+    } else {
+      const userRoles = user.roles;
+      var userPrivileges = [];
+      for (let i = 0; i < userRoles.length; i++) {
+        const userRoleTemp = await dbAccess.getInstance(
+          "user_roles",
+          "UUID",
+          userRoles[i]
+        );
+        if (userRoleTemp.instance.privileges) {
+          for (let j = 0; j < userRoleTemp.instance.privileges.length; j++) {
+            userPrivileges.push(userRoleTemp.instance.privileges[j]);
+          }
+        }
+      }
+      const allPrivilegesTemp = await dbAccess.getFilteredAndSortedCollection(
+        "user_privileges"
+      );
+      var allPrivileges = allPrivilegesTemp.instances;
 
-    const data_1 = await dbAccess.getCollection("user_roles");
-    const roles = data_1.instances;
-    if (!roles) {
-      return res.status(400).json(data_1);
+      const userPrivilegesObjects = [];
+      for (let j = 0; j < allPrivileges.length; j++) {
+        if (userPrivileges.indexOf(allPrivileges[j].UUID) > -1) {
+          userPrivilegesObjects.push(allPrivileges[j]);
+        }
+      }
+      user.privileges = userPrivilegesObjects;
     }
 
-    var filteredRoles = [];
-    roles.forEach(function (role) {
-      const roleIsSuperAdmin = dbAccess.superAdmin === role.UUID;
-      const roleIsAppAdmin = dbAccess.appAdmin === role.UUID;
-      if (isSuperAdmin && !roleIsSuperAdmin) {
-        filteredRoles.push(role);
-      } else if (isAppAdmin && !roleIsSuperAdmin && !roleIsAppAdmin) {
-        filteredRoles.push(role);
-      }
-    });
-
-    res.set("access-control-allow-origin", "*");
     res.status(200).json({
       status: true,
-      instances: filteredRoles,
+      jwt: req.header("Authorization"),
+      session: req.header("Session"),
+      reason: "",
+      payload: user,
     });
   } catch (error) {
     res.status(404).json({ detail: "Error occured when accessing db" });
@@ -315,8 +350,7 @@ router.get("/get_users", async (req, res) => {
   const validation = await verify_session_user_privilege(
     req.header("Session"),
     req.header("Authorization"),
-    USER_COLLECTION,
-    "view"
+    USER_COLLECTION
   );
   if (!validation.status) {
     return res.status(validation.errorCode).json({
@@ -332,7 +366,6 @@ router.get("/get_users", async (req, res) => {
       return res.status(400).json(data);
     }
 
-    res.set("access-control-allow-origin", "*");
     res.status(200).json({
       status: true,
       instances: users,
@@ -342,15 +375,12 @@ router.get("/get_users", async (req, res) => {
   }
 });
 
-//ad_user? what are the types of users
 router.post("/create_user", async (req, res) => {
-  const request_data = req.body;
-
   const validation = await verify_session_user_privilege(
     req.header("Session"),
     req.header("Authorization"),
     USER_COLLECTION,
-    "edit"
+    true
   );
   if (!validation.status) {
     return res.status(validation.errorCode).json({
@@ -359,6 +389,8 @@ router.post("/create_user", async (req, res) => {
     });
   }
   const current_user = validation.current_user;
+
+  const request_data = req.body;
 
   try {
     const data = await dbAccess.getInstance(
@@ -410,7 +442,6 @@ router.post("/create_user", async (req, res) => {
     };
     on_data_update(msg);
 
-    res.set("access-control-allow-origin", "*");
     res.status(200).json({
       status: true,
       UUID: newId,
@@ -421,15 +452,12 @@ router.post("/create_user", async (req, res) => {
   }
 });
 
-//findone and replaceone in users
 router.post("/update_user", async (req, res) => {
-  const request_data = req.body;
-
   const validation = await verify_session_user_privilege(
     req.header("Session"),
     req.header("Authorization"),
     USER_COLLECTION,
-    "edit"
+    true
   );
   if (!validation.status) {
     return res.status(validation.errorCode).json({
@@ -439,6 +467,7 @@ router.post("/update_user", async (req, res) => {
   }
   const current_user = validation.current_user;
 
+  const request_data = req.body;
   console.log(`User update request recieved for"${request_data.instance_name}`);
 
   try {
@@ -511,7 +540,7 @@ router.post("/update_user", async (req, res) => {
     on_data_update(msg);
 
     console.log("end");
-    res.set("access-control-allow-origin", "*");
+
     res.status(200).json({
       status: true,
       reason: "",
@@ -521,320 +550,138 @@ router.post("/update_user", async (req, res) => {
   }
 });
 
-//delete many in users
-router.post("/delete_user", async (req, res) => {
-  const validSession = userSessionUpdate(req.header("Session"));
-  if (!validSession)
-    return res.status(400).json({
-      status: false,
-      reason: "Session is terminated",
-    });
+// router.post("/reset_password", async (req, res) => {
+//   const request_data = req.body;
+//   try {
+//     // Check if reset code is provided
+//     if (!request_data.code) {
+//       return res.status(400).json({
+//         status: false,
+//         reason: "Reset code not given",
+//       });
+//     }
 
-  const current_user = get_user_from_jwt_token(req.header("Authorization"));
+//     // Validate the reset code and get the associated user
+//     const current_user = get_user_from_jwt_token_reset_pwd(request_data.code);
+//     if (!current_user) {
+//       return res.status(400).json({
+//         status: false,
+//         reason: "Your token has either expired or is invalid",
+//       });
+//     }
 
-  if (!current_user)
-    return res.status(400).json({
-      status: false,
-      reason: "Invalid authorization token",
-    });
+//     // Check if new password is provided
+//     if (!request_data.pwd) {
+//       return res.status(400).json({
+//         status: false,
+//         reason: "Password not given",
+//       });
+//     }
 
-  const request_data = req.body;
+//     console.log(`Reset password request received for ${current_user}`);
 
-  if (!request_data.instance_name)
-    return res.status(400).json({
-      status: false,
-      reason: "Username not given",
-    });
+//     // Fetch user details from the database
+//     const data = await dbAccess.getInstance(
+//       USER_COLLECTION,
+//       "instance_name",
+//       current_user,
+//       true
+//     );
+//     const user = data.instance;
 
-  console.log(`User delete request recieved for"${request_data.instance_name}`);
+//     if (!user) {
+//       return res.status(400).json({
+//         status: false,
+//         reason: "User not found in the system",
+//       });
+//     }
 
-  try {
-    const check = await check_privilege(current_user, "Manage Users");
-    if (!check)
-      return res.status(403).json({
-        status: false,
-        reason: "Encountered an error when accessing the database",
-      });
+//     // Check password policy
+//     const policyValidation = await check_policy(request_data.pwd);
+//     if (policyValidation) {
+//       return res.status(400).json({
+//         status: false,
+//         reason: "Password policy validation failed",
+//       });
+//     }
 
-    var deletedEntities = [];
-    const result = await dbAccess.deleteInstances(
-      USER_COLLECTION,
-      "instance_name",
-      request_data,
-      deletedEntities
-    );
-    if (result.status === false) return res.status(400).json(result);
+//     // Hash and update the password
+//     const salt = await bcrypt.genSalt();
+//     const passwordHash = await bcrypt.hash(request_data.pwd, salt);
+//     user.pwd = passwordHash.toString("binary");
 
-    for (let i = 0; i < result.deletedEntities.length; i++) {
-      const msg = {
-        notification_type: "delete_entity_instance",
-        payload: {
-          entity_name: result.deletedEntities[i],
-        },
-      };
-      on_data_update(msg);
-      userLogs(current_user, "Delete instance", USER_COLLECTION, "", [
-        result.deletedEntities[i],
-      ]);
-    }
+//     // Update user in the database
+//     const result = await dbAccess.replaceInstance(
+//       USER_COLLECTION,
+//       "instance_name",
+//       current_user,
+//       user,
+//       current_user
+//     );
 
-    res.set("access-control-allow-origin", "*");
-    res.status(200).json(result);
-  } catch (err) {
-    res.status(500).json({ detail: "Error occured when finding user" });
-  }
-});
+//     if (result.status !== true) {
+//       return res.status(400).json(result);
+//     }
 
-router.post("/delete_role", async (req, res) => {
-  const validSession = userSessionUpdate(req.header("Session"));
-  if (!validSession)
-    return res.status(400).json({
-      status: false,
-      reason: "Session is terminated",
-    });
+//     // Log user action and notify data update
+//     userLogs(current_user, "Reset password", USER_COLLECTION, current_user, [
+//       result.instance,
+//     ]);
+//     const msg = {
+//       notification_type: "replace_entity_instance",
+//       payload: {
+//         entity_name: USER_COLLECTION,
+//         UUID: user.UUID,
+//       },
+//     };
+//     on_data_update(msg);
 
-  const current_user = get_user_from_jwt_token(req.header("Authorization"));
-
-  if (!current_user)
-    return res.status(400).json({
-      status: false,
-      reason: "Invalid authorization token",
-    });
-
-  const request_data = req.body;
-
-  if (!request_data.UUID)
-    return res.status(400).json({
-      status: false,
-      reason: "Role not given",
-    });
-
-  console.log(`Role delete request recieved`);
-
-  try {
-    const check = await check_privilege(current_user, "Manage Users");
-    if (!check)
-      return res.status(403).json({
-        status: false,
-        reason: "Encountered an error when accessing the database",
-      });
-
-    const data = await dbAccess.getInstance(
-      "user_roles",
-      "UUID",
-      request_data.UUID,
-      true
-    );
-    var instance = data.instance;
-    if (!instance) {
-      return res.status(400).json({
-        status: false,
-        reason: "Role not found in the system",
-      });
-    }
-
-    const data_1 = await dbAccess.getFilteredAndSortedCollection(
-      "users",
-      ["roles"],
-      [request_data.UUID],
-      [0],
-      true
-    );
-    const usersWithRole = data_1.instances;
-    var canDeleteRole = true;
-    for (let i = 0; i < usersWithRole.length; i++) {
-      var user = usersWithRole[i];
-      if (user.roles.length === 1) {
-        canDeleteRole = false;
-        break;
-      } else {
-        const roles = user.roles;
-        const index = roles.indexOf(request_data.UUID);
-        if (index > -1) {
-          roles.splice(index, 1);
-        }
-        user["roles"] = roles;
-        await dbAccess.replaceInstance(
-          USER_COLLECTION,
-          "instance_name",
-          user.instance_name,
-          user,
-          current_user
-        );
-        const msg = {
-          notification_type: "replace_entity_instance",
-          payload: {
-            entity_name: USER_COLLECTION,
-            UUID: user.UUID,
-          },
-        };
-        on_data_update(msg);
-      }
-    }
-
-    if (canDeleteRole === false) {
-      return res.status(400).json({
-        status: false,
-        reason: "Cannot delete the role due to dependencies",
-      });
-    }
-
-    var deletedEntities = [];
-    const result = await dbAccess.deleteInstances(
-      "user_roles",
-      "UUID",
-      instance,
-      deletedEntities
-    );
-    if (result.status === false) return res.status(400).json(result);
-
-    for (let i = 0; i < result.deletedEntities.length; i++) {
-      const msg = {
-        notification_type: "delete_entity_instance",
-        payload: {
-          entity_name: result.deletedEntities[i],
-        },
-      };
-      on_data_update(msg);
-      userLogs(current_user, "Delete instance", "user_roles", "", [
-        result.deletedEntities[i],
-      ]);
-    }
-
-    res.set("access-control-allow-origin", "*");
-    res.status(200).json(result);
-  } catch (err) {
-    res.status(500).json({ detail: "Error occured when finding user" });
-  }
-});
-
-router.post("/change_credentials", async (req, res) => {
-  const validSession = userSessionUpdate(req.header("Session"));
-  if (!validSession)
-    return res.status(400).json({
-      status: false,
-      reason: "Session is terminated",
-    });
-
-  const current_user = get_user_from_jwt_token(req.header("Authorization"));
-
-  if (!current_user)
-    return res.status(400).json({
-      status: false,
-      reason: "Invalid authorization token",
-    });
-
-  const request_data = req.body;
-
-  if (!request_data.pwd)
-    return res.status(400).json({
-      status: false,
-      reason: "Password not given",
-    });
-
-  if (!request_data.new_pwd)
-    return res.status(400).json({
-      status: false,
-      reason: "New password not given",
-    });
-
-  console.log(`Change credentials request recieved for ${current_user}`);
-
-  try {
-    const data = await dbAccess.getInstance(
-      USER_COLLECTION,
-      "instance_name",
-      current_user,
-      true
-    );
-    const user = data.instance;
-    if (!user) {
-      return res.status(400).json({
-        status: false,
-        reason: "User not found in the system",
-      });
-    }
-
-    const isMatch = await bcrypt.compare(request_data.pwd, user.pwd.toString());
-    if (!isMatch)
-      return res.status(400).json({
-        status: false,
-        reason: "Wrong current password",
-      });
-
-    const policyValidation = await check_policy(request_data.new_pwd);
-    if (policyValidation)
-      return res.status(400).json({
-        status: false,
-        reason: policyValidation,
-      });
-
-    const salt = await bcrypt.genSalt();
-    const passwordHash = await bcrypt.hash(request_data.new_pwd, salt);
-    user.pwd = passwordHash.toString("binary");
-
-    const result = await dbAccess.replaceInstance(
-      USER_COLLECTION,
-      "instance_name",
-      current_user,
-      user,
-      current_user
-    );
-    if (result.status !== true) return res.status(400).json(result.status);
-
-    userLogs(
-      current_user,
-      "Change user credentials",
-      USER_COLLECTION,
-      current_user,
-      [result.instance]
-    );
-    const msg = {
-      notification_type: "replace_entity_instance",
-      payload: {
-        entity_name: USER_COLLECTION,
-        UUID: user.UUID,
-      },
-    };
-    on_data_update(msg);
-
-    res.set("access-control-allow-origin", "*");
-    res.status(200).json({
-      status: true,
-      instance: result.instance,
-      reason: "",
-    });
-  } catch (err) {
-    res.status(500).json({ detail: "Error occured when finding user" });
-  }
-});
+//     // Return success response
+//     res.status(200).json({
+//       status: true,
+//       instance: user,
+//       reason: "",
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res
+//       .status(500)
+//       .json({ detail: "Error occurred during password reset process" });
+//   }
+// });
 
 router.post("/reset_password", async (req, res) => {
   const request_data = req.body;
 
-  if (!request_data.code)
-    return res.status(400).json({
-      status: false,
-      reason: "Reset code not given",
-    });
-
-  const current_user = get_user_from_jwt_token_reset_pwd(request_data.code);
-  if (!current_user) {
-    return res.status(400).json({
-      status: false,
-      reason: "Your token has either expired or is invalid",
-    });
-  }
-
-  if (!request_data.pwd)
-    return res.status(400).json({
-      status: false,
-      reason: "Password not given",
-    });
-
-  console.log(`Reset password request recieved for ${current_user}`);
-
   try {
+    if (!request_data.code) {
+      return res.status(400).json({
+        status: false,
+        reason: "Reset code not given",
+      });
+    }
+
+    const current_user = get_user_from_jwt_token_reset_pwd(request_data.code);
+    const extendedValidityPeriodInMs = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    if (
+      !current_user ||
+      current_user.exp < Date.now() - extendedValidityPeriodInMs
+    ) {
+      return res.status(400).json({
+        status: false,
+        reason: "Your token has either expired or is invalid",
+      });
+    }
+
+    if (!request_data.pwd) {
+      return res.status(400).json({
+        status: false,
+        reason: "Password not given",
+      });
+    }
+
+    console.log(`Reset password request received for ${current_user}`);
+
     const data = await dbAccess.getInstance(
       USER_COLLECTION,
       "instance_name",
@@ -850,11 +697,12 @@ router.post("/reset_password", async (req, res) => {
     }
 
     const policyValidation = await check_policy(request_data.pwd);
-    if (policyValidation)
+    if (policyValidation) {
       return res.status(400).json({
         status: false,
         reason: "Password policy validation failed",
       });
+    }
 
     const salt = await bcrypt.genSalt();
     const passwordHash = await bcrypt.hash(request_data.pwd, salt);
@@ -867,11 +715,14 @@ router.post("/reset_password", async (req, res) => {
       user,
       current_user
     );
-    if (result.status !== true) return res.status(400).json(result);
+    if (result.status !== true) {
+      return res.status(400).json(result);
+    }
 
     userLogs(current_user, "Reset password", USER_COLLECTION, current_user, [
       result.instance,
     ]);
+
     const msg = {
       notification_type: "replace_entity_instance",
       payload: {
@@ -881,20 +732,22 @@ router.post("/reset_password", async (req, res) => {
     };
     on_data_update(msg);
 
-    res.set("access-control-allow-origin", "*");
-    res.status(200).json({
+    return res.status(200).json({
       status: true,
       instance: user,
       reason: "",
     });
   } catch (err) {
-    res.status(500).json({ detail: "Error occured when finding user" });
+    console.error("Error occurred when resetting password:", err);
+    return res.status(500).json({
+      status: false,
+      reason: "Error occurred when resetting password",
+    });
   }
 });
 
 router.post("/forgot_password", async (req, res) => {
   const request_data = req.body;
-
   if (!request_data.username)
     return res.status(400).json({
       status: false,
@@ -908,7 +761,7 @@ router.post("/forgot_password", async (req, res) => {
   try {
     const data = await dbAccess.getInstance(
       USER_COLLECTION,
-      "instance_name",
+      "email",
       request_data.username,
       true
     );
@@ -948,6 +801,8 @@ router.post("/forgot_password", async (req, res) => {
       },
     });
 
+    console.log("URL", process.env.FRONTEND_URL);
+
     transporter.verify().then(console.log("Verified")).catch(console.error);
 
     const resetToken = jwt.sign(
@@ -957,6 +812,8 @@ router.post("/forgot_password", async (req, res) => {
         expiresIn: process.env.JWT_SECRET_PWD_RESET_EXPIRES_IN,
       }
     );
+
+    console.log("Generated Reset Token:", resetToken);
     transporter
       .sendMail({
         from: `"Nova <${emailSettingsMap.get("email_host")}>`, // sender address
@@ -969,13 +826,15 @@ router.post("/forgot_password", async (req, res) => {
             cid: "logo", //same cid value as in the html img src
           },
         ],
-        html: `<p>A password reset request was made for your account. 
-    To reset your password please click on the following link</p>
-    <a href=${process.env.FRONTEND_URL}/reset-password?code=${resetToken}>${process.env.FRONTEND_URL}/reset-password?code=${resetToken}</a>
-    <p>If this was not you please ignore this email</p><br/><br/><br/>
-    <img style="width:100px; float: left; margin-right: 10px;" src='cid:logo'/>
-    <p>Powered by Nova</p>
-    <br/><br/><br/>`,
+        html: `<p>A password reset request was made for your account. To reset your password, please click on the following link this link will expire after 5 mins:</p>
+          <a href="http://localhost:3000/reset-password?code=${resetToken}">http://localhost:3000/reset-password?code=${resetToken}</a>
+          <p>If this was not you, please ignore this email.</p>
+          <br/><br/><br/>
+          <img style="width:100px; float: left; margin-right: 10px;" src='cid:logo'/>
+          <p>Powered by Nova</p>
+          <br/><br/><br/>
+
+          `,
       })
       .then((info) => {
         userLogs(
@@ -983,9 +842,8 @@ router.post("/forgot_password", async (req, res) => {
           `Password reset request made and email setn to ${user.email}`
         );
       })
-      .catch(console.log("fail"));
+      .catch(() => console.log("fail"));
 
-    res.set("access-control-allow-origin", "*");
     res.status(200).json({
       status: true,
       reason: "An email was sent to your account",
@@ -995,47 +853,117 @@ router.post("/forgot_password", async (req, res) => {
   }
 });
 
-router.get("/get_password_settings", async (req, res) => {
-  const validSession = userSessionUpdate(req.header("Session"));
-  if (!validSession)
-    return res.status(400).json({
-      status: false,
-      reason: "Session is terminated",
-    });
+// router.post("/forgot_password", async (req, res) => {
+//   const { username } = req.body;
 
-  console.log("Request password settings");
+//   try {
+//     // Check if username is provided
+//     if (!username) {
+//        return res.status(400).json({
+//         status: false,
+//         reason: "Username not given",
+//       });
+//     }
 
-  const current_user = get_user_from_jwt_token(req.header("Authorization"));
-  if (!current_user)
-    return res.status(400).json({
-      status: false,
-      reason: "Invalid authorization token",
-    });
+//     // Fetch user details from the database
+//     const userData = await dbAccess.getInstance(
+//       USER_COLLECTION,
+//       "email",
+//       username,
+//       true
+//     );
+//     const user = userData.instance;
 
-  try {
-    const data = await dbAccess.getFilteredAndSortedCollection(
-      "settings",
-      ["category"],
-      ["password policies"],
-      [0],
-      false
-    );
-    const instances = data.instances;
-    if (!instances) {
-      return res.status(400).json({
-        status: false,
-        reason: "Instances not found in the system",
-      });
-    }
+//     // Check if user exists
+//     if (!user) {
+//       return res.status(400).json({
+//         status: false,
+//         reason: "No user is registered with this username",
+//       });
+//     }
 
-    res.set("access-control-allow-origin", "*");
-    res.status(200).json({
-      status: true,
-      instances: instances,
-    });
-  } catch (err) {
-    res.status(500).json({ detail: "Error occured when accessing db" });
-  }
-});
+//     // Fetch email settings from the database
+//     const emailSettingsData = await dbAccess.getFilteredAndSortedCollection(
+//       SETTINGS_COLLECTION,
+//       [SETTINGS_CATEGORY],
+//       [SETTINGS_EMAIL_SETTINGS],
+//       [0]
+//     );
+//     const emailSettings = emailSettingsData.instances;
+
+//     // Check if email settings are available
+//     if (!emailSettings || emailSettings.length === 0) {
+//       return res.status(400).json({
+//         status: false,
+//         reason: "Password policies are not found",
+//       });
+//     }
+
+//     // Create a map of email settings for easier access
+//     const emailSettingsMap = new Map();
+//     emailSettings.forEach((item) => {
+//       emailSettingsMap.set(item.instance_name, item.value);
+//     });
+
+//     // Create a nodemailer transporter
+//     const transporter = nodemailer.createTransport({
+//       host: emailSettingsMap.get("email_host"),
+//       port: emailSettingsMap.get("email_port"),
+//       auth: {
+//         user: emailSettingsMap.get("email_host_user"),
+//         pass: emailSettingsMap.get("email_host_password"),
+//       },
+//     });
+
+//     // Verify transporter
+//     await transporter.verify();
+
+//     // Generate a reset token
+//     const resetToken = jwt.sign(
+//       { user: user.instance_name },
+//       process.env.JWT_SECRET_PWD_RESET,
+//       {
+//         expiresIn: process.env.JWT_SECRET_PWD_RESET_EXPIRES_IN,
+//       }
+//     );
+
+//     console.log("Generated Reset Token:", resetToken);
+
+//     // Log the generated reset URL
+
+//     const resetPasswordURL = `${process.env.FRONTEND_URL}/reset-password?code=${resetToken}`;
+//     console.log("Reset Password URL:", resetPasswordURL);
+
+//     // Send password reset email
+//     await transporter.sendMail({
+//       from: `"Nova <${emailSettingsMap.get("email_host")}>`,
+//       to: `${user.email}`,
+//       subject: "Password reset request",
+//       html: `<p>A password reset request was made for your account. To reset your password, please click on the following link:</p>
+//         <a href="${resetPasswordURL}">${resetPasswordURL}</a>
+//         <p>If this was not you, please ignore this email.</p>
+//         <br/><br/><br/>
+//         <p>Powered by Nova</p>
+//         <br/><br/><br/>`,
+//     });
+
+//     // Log the password reset request
+//     userLogs(
+//       user.instance_name,
+//       `Password reset request made and email sent to ${user.email}`
+//     );
+
+//     // Send success response
+//     res.status(200).json({
+//       status: true,
+//       reason: "An email was sent to your account",
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res
+//       .status(500)
+//       .json({ detail: "Error occurred during password reset process" });
+//   }
+// });
 
 module.exports = router;

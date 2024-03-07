@@ -15,6 +15,7 @@ import Multiselect from '../../../node_modules/multiselect-react-dropdown/dist/i
 
 const CompanyForm = ({ formOpen, closeForm, UUID, setSuccessSnackbarMessage, setErrorSnackbarMessag }) => {
     const [selectedTenants, setSelectedTenants] = useState([]);
+    const [initialTenants, setInitialTenants] = useState([]);
     const [tenants, setTenants] = useState([]);
     const [initialValues, setInitialValues] = useState({
         instance_name: '',
@@ -32,6 +33,7 @@ const CompanyForm = ({ formOpen, closeForm, UUID, setSuccessSnackbarMessage, set
                     temp['UUID'] = data.instance.UUID;
                     temp['address_1'] = data.instance.address_1;
                     temp['address_2'] = data.instance.address_2;
+                    setInitialTenants(data.instance.tenants);
                     setSelectedTenants(data.instance.tenants);
                     setInitialValues(temp);
                 }
@@ -40,15 +42,38 @@ const CompanyForm = ({ formOpen, closeForm, UUID, setSuccessSnackbarMessage, set
     }, [UUID]);
 
     useEffect(() => {
-        const tenantsSub = serviceFactoryInstance.dataLoaderService.dataSub(`${ENTITY_NAME_TENANT}>summary`).subscribe((data) => {
-            if (data) {
-                setTenants(data);
+        const companySub = serviceFactoryInstance.dataLoaderService.dataSub(ENTITY_NAME_COMPANY).subscribe((companyData) => {
+            if (companyData) {
+                var takenTenants = [];
+                for (let i = 0; i < companyData.length; i++) {
+                    if (companyData[i].tenants) {
+                        takenTenants = [...takenTenants, ...companyData[i].tenants];
+                    }
+                }
+                serviceFactoryInstance.dataLoaderService.dataSub(`${ENTITY_NAME_TENANT}>summary`).subscribe((tenantData) => {
+                    if (tenantData) {
+                        var allowedTenants = [];
+                        for (let i = 0; i < tenantData.length; i++) {
+                            var fail = false;
+                            for (let j = 0; j < takenTenants.length; j++) {
+                                if (takenTenants[j].UUID === tenantData[i].UUID) {
+                                    fail = true;
+                                }
+                            }
+                            if (fail !== true) {
+                                allowedTenants.push(tenantData[i]);
+                            }
+                        }
+                        setTenants([...allowedTenants, ...initialTenants]);
+                    }
+                });
             }
         });
+
         return () => {
-            tenantsSub.unsubscribe();
+            companySub.unsubscribe();
         };
-    }, [serviceFactoryInstance.cache]);
+    }, [serviceFactoryInstance.cache, initialTenants]);
 
     const onSelect = (selectedList, selectedItem) => {
         setSelectedTenants([...selectedList]);
@@ -83,7 +108,8 @@ const CompanyForm = ({ formOpen, closeForm, UUID, setSuccessSnackbarMessage, set
                         enableReinitialize
                         initialValues={initialValues}
                         validationSchema={Yup.object().shape({
-                            instance_name: Yup.string().required('Company name is required')
+                            instance_name: Yup.string().required('Company name is required'),
+                            tenants: Yup.array().required('Tenant is Required')
                         })}
                         onSubmit={async (values, { setErrors, setSubmitting }) => {
                             setSubmitting(true);
@@ -197,15 +223,20 @@ const CompanyForm = ({ formOpen, closeForm, UUID, setSuccessSnackbarMessage, set
                                     </Grid>
                                     <Grid item xs={12}>
                                         <Stack spacing={1} style={{ height: 200 }}>
-                                            <InputLabel htmlFor="company-form-tenants">Select tenants to apply template</InputLabel>
-                                            <Multiselect
-                                                showCheckbox={true}
-                                                options={tenants} // Options to display in the dropdown
-                                                selectedValues={selectedTenants} // Preselected value to persist in dropdown
-                                                onSelect={onSelect} // Function will trigger on select event
-                                                onRemove={onRemove} // Function will trigger on remove event
-                                                displayValue="instance_name" // Property name to display in the dropdown options
-                                            />
+                                            <InputLabel htmlFor="company-form-tenants">
+                                                Select Tenants<span style={{ color: 'red' }}>*</span>
+                                            </InputLabel>
+                                            <div style={{ height: '200px', overflowY: 'auto' }}>
+                                                <Multiselect
+                                                    showCheckbox={true}
+                                                    name="tenants"
+                                                    options={tenants} // Options to display in the dropdown
+                                                    selectedValues={selectedTenants} // Preselected value to persist in dropdown
+                                                    onSelect={onSelect} // Function will trigger on select event
+                                                    onRemove={onRemove} // Function will trigger on remove event
+                                                    displayValue="instance_name" // Property name to display in the dropdown options
+                                                />
+                                            </div>
                                             {touched.tenants && errors.tenants && (
                                                 <FormHelperText error id="standard-weight-helper-text-company-form-tenants">
                                                     {errors.tenants}

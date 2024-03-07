@@ -25,9 +25,18 @@ const UpgradeVMForm = ({ formOpen, closeForm, setSuccessSnackbarMessage, setErro
     const [vms, setVms] = useState();
     const [vm, setVm] = useState();
     const [device, setDevice] = useState();
+    const [tenant, setTenant] = useState();
+    useEffect(() => {
+        const tenantSub = serviceFactoryInstance.authService.getTenantObservable().subscribe((tenant) => {
+            setTenant(tenant);
+        });
+        return () => {
+            tenantSub.unsubscribe();
+        };
+    }, [serviceFactoryInstance.authService]);
 
     useEffect(() => {
-        const devicesSub = serviceFactoryInstance.dataLoaderService.dataSub(`${ENTITY_NAME_DEVICE}>summary`).subscribe((data) => {
+        const devicesSub = serviceFactoryInstance.dataLoaderService.dataSub(ENTITY_NAME_DEVICE, tenant).subscribe((data) => {
             if (data) {
                 setDevices(data);
             }
@@ -36,7 +45,7 @@ const UpgradeVMForm = ({ formOpen, closeForm, setSuccessSnackbarMessage, setErro
         return () => {
             devicesSub.unsubscribe();
         };
-    }, [serviceFactoryInstance.cache]);
+    }, [serviceFactoryInstance.cache, tenant]);
 
     useEffect(() => {
         setVm();
@@ -77,7 +86,9 @@ const UpgradeVMForm = ({ formOpen, closeForm, setSuccessSnackbarMessage, setErro
                     CPU: Yup.number()
                         .integer()
                         .min(vm && vm.CPU ? vm.CPU : 0)
-                        .required()
+                        .required(),
+                    device_id: Yup.string().required('Device is required'),
+                    vm_id: Yup.string().required('VNF is required')
                 })}
                 initialValues={initialValues}
                 onSubmit={async (values, { setErrors, setSubmitting }) => {
@@ -86,7 +97,7 @@ const UpgradeVMForm = ({ formOpen, closeForm, setSuccessSnackbarMessage, setErro
                     job.arguments = values;
                     setSubmitting(true);
                     serviceFactoryInstance.dataLoaderService
-                        .addInstance(ENTITY_NAME_FRONTEND_JOBS, job)
+                        .addJob(ENTITY_NAME_FRONTEND_JOBS, job)
                         .then((data) => {
                             if (data.status) {
                                 setSubmitting(false);
@@ -170,7 +181,7 @@ const UpgradeVMForm = ({ formOpen, closeForm, setSuccessSnackbarMessage, setErro
                                                       (vm) =>
                                                           vm && (
                                                               <MenuItem key={vm.UUID} value={vm.UUID}>
-                                                                  {vm.instance_name}
+                                                                  {vm.UUID}
                                                               </MenuItem>
                                                           )
                                                   )

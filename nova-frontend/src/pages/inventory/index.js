@@ -54,7 +54,7 @@ const InventoryPage = ({ title }) => {
         return () => {
             tenantSub.unsubscribe();
         };
-    }, [serviceFactoryInstance.cache]);
+    }, [serviceFactoryInstance.authService]);
 
     useEffect(() => {
         document.title = title;

@@ -8,16 +8,16 @@
             "numeric": false,
             "label": "Timestamp",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         },
         {
-            "name": "user",
+            "name": "created_by",
             "numeric": false,
             "label": "User",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         },
@@ -26,7 +26,7 @@
             "numeric": false,
             "label": "Collection",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         },
@@ -35,7 +35,7 @@
             "numeric": false,
             "label": "Action",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         },
@@ -44,7 +44,7 @@
             "numeric": false,
             "label": "Entry name",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         },
@@ -53,7 +53,7 @@
             "numeric": false,
             "label": "Entry",
             "options": {
-                "filter": true,
+                "filter": false,
                 "sort": true
             }
         }

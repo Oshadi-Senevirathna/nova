@@ -5,6 +5,7 @@ let instanceDetails = require("../middleware/instance_details.js");
 let reshape = require("../middleware/reshape.js");
 let cleanDelete = require("../middleware/clean_delete.js");
 let uniqueCheck = require("../middleware/unique_check.js");
+let { ObjectID } = require("mongodb");
 
 dotenv.config();
 //all gets send reshaped data except for getinstance
@@ -12,8 +13,7 @@ dotenv.config();
 class DBAccess {
   constructor() {
     this.db = null;
-    this.rolesUUID = new Map();
-    this.roles = new Map();
+    this.privilegesMap = new Map();
     this.superAdmin = null;
     this.appAdmin = null;
   }
@@ -26,7 +26,7 @@ class DBAccess {
         useCreateIndex: true,
       })
       .then(() => {
-        // this.getPrivileges()
+        this.getPrivileges();
         console.log("Connected to reader");
       })
       .catch((error) => console.log(`${error} did not connect`));
@@ -34,44 +34,248 @@ class DBAccess {
     this.db = mongoose.connection;
   }
 
-  /* async getPrivileges()
-    {
-        try{
-            const data = await this.getCollection('user_roles', true)
-            const allRoles = data.instances
-            const data_1 = await this.getCollection('user_privileges', true)
-            const allPrivileges = data_1.instances
-                
-            const allPrivilegesArray = new Map()
-            allPrivileges.forEach((item)=>{
-                allPrivilegesArray.set(item.UUID, `${item.instance_name}`)
+  // roles getting
+  async getRoles(entity_name, unshaped) {
+    try {
+      if (entity_name !== "user_roles") {
+        return {
+          status: false,
+          reason: "This function is only for retrieving roles",
+        };
+      }
 
-            })
+      const collection_exist = check_collection_exist(entity_name);
 
-            const allRolesArray = new Map()
-            const rolesUUID = new Map()
-            allRoles.forEach((role) => {
-                var privileges = []
-                role.privileges.forEach((privilege)=>{
-                    privileges.push(allPrivilegesArray.get(privilege)|| privilege)
-                })
-                allRolesArray.set(role.UUID, privileges)
-                rolesUUID.set(role.UUID,role.instance_name)
-                if(role.instance_name==='Super Administrator'){
-                    this.superAdmin = role.UUID
-                }
-                if(role.instance_name==='Application Administrator'){
-                    this.appAdmin = role.UUID
-                }
-            }) 
-            this.rolesUUID = rolesUUID
-            this.roles = allRolesArray  
+      if (!collection_exist) {
+        return { status: false, reason: "The roles collection doesn't exist" };
+      }
+
+      const results = [];
+      const result = this.db.db.collection(entity_name).find();
+
+      await result.forEach(function (item) {
+        results.push(item);
+      });
+
+      if (unshaped !== true) {
+        var filterDet = {};
+        filterDet["entity_name"] = entity_name;
+        const shape = await this.db.db
+          .collection("collection_details")
+          .findOne(filterDet);
+        if (shape && results) {
+          return reshape(shape, results);
         }
-        catch{
-            return
-        }
-    } */
+      }
 
+      return { status: true, roles: results };
+    } catch (error) {
+      console.error(error);
+      return {
+        status: false,
+        reason: "Was not able to access the roles collection in the database",
+      };
+    }
+  }
+
+  //get tenant
+  // roles getting
+  // async getTenant(entity_name, UUID, unshaped) {
+  //   try {
+  //     if (entity_name !== "users") {
+  //       return {
+  //         status: false,
+  //         reason: "This function is only for retrieving tenants",
+  //       };
+  //     }
+
+  //     const collection_exist = check_collection_exist(entity_name);
+
+  //     if (!collection_exist) {
+  //       return {
+  //         status: false,
+  //         reason: "The tenants collection doesn't exist",
+  //       };
+  //     }
+
+  //     const results = [];
+  //     const result = this.db.db.collection(entity_name).find({ UUID });
+
+  //     await result.forEach(function (item) {
+  //       results.push(item);
+  //     });
+  //     console.log("Results", results);
+  //     if (unshaped !== true) {
+  //       var filterDet = {};
+  //       filterDet["entity_name"] = entity_name;
+  //       const shape = await this.db.db
+  //         .collection("collection_details")
+  //         .findOne(filterDet);
+  //       if (shape && results) {
+  //         return reshape(shape, results);
+  //       }
+  //     }
+
+  //     return { status: true, tenants: results };
+  //   } catch (error) {
+  //     console.error(error);
+  //     return {
+  //       status: false,
+  //       reason: "Was not able to access the tenants collection in the database",
+  //     };
+  //   }
+  // }
+  // async getTenant function
+  // async getTenant function
+  async getTenant(entity_name, UUID, unshaped) {
+    try {
+      if (entity_name !== "users") {
+        return {
+          status: false,
+          reason: "This function is only for retrieving tenants",
+        };
+      }
+
+      const collection_exist = check_collection_exist(entity_name);
+
+      if (!collection_exist) {
+        return {
+          status: false,
+          reason: "The tenants collection doesn't exist",
+        };
+      }
+
+      const results = [];
+      const result = this.db.db
+        .collection(entity_name)
+        .find({ UUID: { $eq: UUID } });
+
+      await result.forEach(function (item) {
+        results.push({
+          tenants: item.tenants,
+        });
+      });
+      console.log("Results", results);
+
+      if (unshaped !== true) {
+        var filterDet = {};
+        filterDet["entity_name"] = entity_name;
+        const shape = await this.db.db
+          .collection("collection_details")
+          .findOne(filterDet);
+        if (shape && results) {
+          return reshape(shape, results);
+        }
+      }
+
+      return { status: true, tenants: results };
+    } catch (error) {
+      console.error(error);
+      return {
+        status: false,
+        reason: "Was not able to access the tenants collection in the database",
+      };
+    }
+  }
+
+  // Role names getting
+  // async getRolesnames(entity_name, UUID, unshaped) {
+  //   try {
+  //     if (entity_name !== "user_roles") {
+  //       return {
+  //         status: false,
+  //         reason: "This function is only for retrieving roles",
+  //       };
+  //     }
+
+  //     const collection_exist = check_collection_exist(entity_name);
+
+  //     if (!collection_exist) {
+  //       return { status: false, reason: "The roles collection doesn't exist" };
+  //     }
+
+  //     const results = [];
+  //     const result = this.db.db.collection(entity_name).find(UUID);
+
+  //     await result.forEach(function (item) {
+  //       results.push(item);
+  //     });
+
+  //     if (unshaped !== true) {
+  //       var filterDet = {};
+  //       filterDet["entity_name"] = entity_name;
+  //       const shape = await this.db.db
+  //         .collection("collection_details")
+  //         .findOne(filterDet);
+  //       if (shape && results) {
+  //         return reshape(shape, results.instance_name);
+  //       }
+  //     }
+
+  //     return { status: true, roles: results };
+  //   } catch (error) {
+  //     console.error(error);
+  //     return {
+  //       status: false,
+  //       reason: "Was not able to access the roles collection in the database",
+  //     };
+  //   }
+  // }
+  async getRolesnames(entity_name, UUID) {
+    try {
+      if (entity_name !== "user_roles") {
+        return {
+          status: false,
+          reason: "This function is only for retrieving roles",
+        };
+      }
+
+      const collection_exist = check_collection_exist(entity_name);
+
+      if (!collection_exist) {
+        return { status: false, reason: "The roles collection doesn't exist" };
+      }
+
+      const role = await this.db.db.collection(entity_name).findOne({ UUID });
+
+      if (!role) {
+        return { status: false, reason: "Role with the given UUID not found" };
+      }
+
+      return { status: true, roleName: role.instance_name };
+    } catch (error) {
+      console.error(error);
+      return {
+        status: false,
+        reason: "Was not able to access the roles collection in the database",
+      };
+    }
+  }
+
+  async getPrivileges() {
+    try {
+      const rolesTemp = await this.getCollection("user_roles", true);
+      const allRoles = rolesTemp.instances;
+      const privilegesTemp = await this.getCollection("user_privileges", true);
+      const allPrivileges = privilegesTemp.instances;
+
+      const privilegesMap = new Map();
+
+      allPrivileges.forEach((privilege) => {
+        var roleList = [];
+        allRoles.forEach((role) => {
+          if (role.privileges.indexOf(privilege.UUID) > -1) {
+            roleList.push(role.UUID);
+          }
+        });
+        privilegesMap.set(privilege.instance_name, roleList);
+      });
+      console.log(privilegesMap);
+      this.privilegesMap = privilegesMap;
+    } catch {
+      return;
+    }
+  }
   async getCollection(entity_name, unshaped) {
     try {
       const collection_exist = check_collection_exist(entity_name);
@@ -100,6 +304,95 @@ class DBAccess {
       return { status: false, reason: "Was not able to access the database" };
     }
   }
+  // async getDeviceCountByTenant(entity_name, tenantUUID) {
+  //   try {
+  //     // Check  the collection exists
+  //     const collectionExist = check_collection_exist(entity_name);
+  //     if (!collectionExist) {
+  //       // return null; //
+  //       return { status: false, reason: "The collection doesn't exist" };
+  //     }
+
+  //     // Construct the filter to find devices by tenantUUID
+  //     const filter = {
+  //       tenant: tenantUUID,
+  //     };
+
+  //     // Use MongoDB aggregation pipeline to count the devices
+  //     const count = await this.db.db
+  //       .collection(entity_name)
+  //       .countDocuments(filter);
+
+  //     return count;
+  //   } catch (error) {
+  //     console.error("Error in getDeviceCountByTenant:", error);
+  //     return null;
+  //   }
+  // }
+
+  // async getDeviceCountAndIdsByTenant(entity_name, tenantUUID) {
+  //   try {
+  //     // Check if the collection exists
+  //     const collectionExist = check_collection_exist(entity_name);
+  //     if (!collectionExist) {
+  //       return { status: false, reason: "The collection doesn't exist" };
+  //     }
+
+  //     // Construct the filter to find devices by tenantUUID
+  //     const filter = {
+  //       tenant: tenantUUID,
+  //     };
+
+  //     const devices = await this.db.db
+  //       .collection(entity_name)
+  //       .find(filter)
+  //       .toArray();
+  //     console.log("filter", filter);
+  //     console.log("entity_name", entity_name);
+
+  //     const deviceIds = devices.map((device) => device.UUID);
+
+  //     const count = devices.length;
+
+  //     return { count, deviceIds };
+  //   } catch (error) {
+  //     console.error("Error in getDeviceCountAndIdsByTenant:", error);
+  //     return null;
+  //   }
+  // }
+  async getDeviceCountAndIdsByTenant(entity_name, tenantUUID) {
+    try {
+      // Check if the collection exists
+      const collectionExist = check_collection_exist(entity_name);
+      if (!collectionExist) {
+        return { status: false, reason: "The collection doesn't exist" };
+      }
+
+      // Split the comma-separated tenantUUID string into an array
+      const tenantUUIDs = tenantUUID.split(",");
+
+      // Construct the filter to find devices by tenantUUIDs using $in operator
+      const filter = {
+        tenant: { $in: tenantUUIDs },
+      };
+
+      const devices = await this.db.db
+        .collection(entity_name)
+        .find(filter)
+        .toArray();
+
+      console.log("filter", filter);
+      console.log("entity_name", entity_name);
+
+      const deviceIds = devices.map((device) => device.UUID);
+      const count = devices.length;
+
+      return { count, deviceIds };
+    } catch (error) {
+      console.error("Error in getDeviceCountAndIdsByTenant:", error);
+      return null;
+    }
+  }
 
   async getFieldValues(entity_name, field) {
     try {
@@ -113,7 +406,6 @@ class DBAccess {
       /* await result.forEach(function (item) {
         results.push(item);
       }); */
-      console.log(result);
 
       return { status: true, instances: result };
     } catch {
@@ -140,7 +432,376 @@ class DBAccess {
       return { status: false, reason: "Was not able to access the database" };
     }
   }
+  async getDeviceCollectionCount(entity_name) {
+    try {
+      const collection_exist = check_collection_exist(entity_name);
+      if (!collection_exist) {
+        return { status: false, reason: "The collection doesn't exist" };
+      }
 
+      const count = await this.db.db.collection(entity_name).countDocuments();
+
+      return count;
+    } catch {
+      return { status: false, reason: "Was not able to access the database" };
+    }
+  }
+  // async getDeviceCollectionCountForJobs(entity_name) {
+  //   try {
+  //     const collectionExist = check_collection_exist(entity_name);
+  //     if (!collectionExist) {
+  //       return { status: false, reason: "The collection doesn't exist" };
+  //     }
+
+  //     // Specify the criteria to target documents with non-empty device_id fields
+  //     const query = {
+  //       "arguments.device_id": { $exists: true, $ne: null },
+  //     };
+
+  //     // Use MongoDB countDocuments to count matching documents in the collection
+  //     const count = await this.db.db
+  //       .collection(entity_name)
+  //       .countDocuments(query);
+
+  //     return { status: true, count };
+  //   } catch (error) {
+  //     console.error("Error in getDeviceCollectionCount:", error);
+  //     return { status: false, reason: "Error accessing the database" };
+  //   }
+  // }
+  async getDeviceCollectionCountForJobs(entity_name) {
+    try {
+      const collectionExist = check_collection_exist(entity_name);
+      if (!collectionExist) {
+        return { status: false, reason: "The collection doesn't exist" };
+      }
+
+      // Specify the criteria to target documents with a non-null, non-missing, and non-"null" device_id fields
+      const query = {
+        "arguments.device_id": { $type: "string", $nin: [null, "null"] },
+      };
+
+      // Use MongoDB countDocuments to count matching documents in the collection
+      const count = await this.db.db
+        .collection(entity_name)
+        .countDocuments(query);
+
+      return { status: true, count };
+    } catch (error) {
+      console.error("Error in getDeviceCollectionCount:", error);
+      return { status: false, reason: "Error accessing the database" };
+    }
+  }
+
+  async getTenantCollectionCount(entity_name, userUUID) {
+    try {
+      const collectionExist = check_collection_exist(entity_name);
+      if (!collectionExist) {
+        return { status: false, reason: "The collection doesn't exist" };
+      }
+
+      // Construct the filter to find a user by UUID
+      const filter = {
+        UUID: userUUID,
+      };
+
+      // Use MongoDB findOne to get the user document for the specified UUID
+      const user = await this.db.db.collection(entity_name).findOne(filter);
+
+      // Check if the user exists
+      if (!user) {
+        return { status: false, reason: "User not found" };
+      }
+
+      // Count the number of tenants associated with the user
+      const tenantCount = user.tenants.length;
+
+      return { status: true, count: tenantCount };
+    } catch (error) {
+      console.error("Error in getTenantCollectionCount:", error);
+      return { status: false, reason: "Error accessing the database" };
+    }
+  }
+  async getTenantCollectionCountAll(entity_name) {
+    try {
+      const collection_exist = check_collection_exist(entity_name);
+      if (!collection_exist) {
+        return { status: false, reason: "The collection doesn't exist" };
+      }
+
+      const count = await this.db.db.collection(entity_name).countDocuments();
+
+      return count;
+    } catch {
+      return { status: false, reason: "Was not able to access the database" };
+    }
+  }
+  // async getTenantCollectionCount(entity_name, userUUID) {
+  //   try {
+  //     const collection_exist = check_collection_exist(entity_name);
+  //     if (!collection_exist) {
+  //       return { status: false, reason: "The collection doesn't exist" };
+  //     }
+  //     const filter = {
+  //       UUID: userUUID,
+  //     };
+
+  //     const count = await this.db.db
+  //       .collection(entity_name)
+  //       .find(filter)
+  //       .countDocuments();
+
+  //     return count;
+  //   } catch {
+  //     return { status: false, reason: "Was not able to access the database" };
+  //   }
+  // }
+  //getting all the device id
+  async getAllDeviceIds(entity_name) {
+    try {
+      // Check if the collection exists
+      const collectionExist = check_collection_exist(entity_name);
+      if (!collectionExist) {
+        // Return null or an empty array
+        return [];
+      }
+
+      // Use MongoDB find to get all device IDs
+      const devices = await this.db.db
+        .collection(entity_name)
+        .find({}, { projection: { UUID: 1 } })
+        .toArray();
+      const deviceIds = devices.map((device) => device.UUID.toString()); // Assuming _id is ObjectId
+      return deviceIds;
+    } catch (error) {
+      console.error("Error in getAllDeviceIds:", error);
+      return []; // or you can return null or throw an error
+    }
+  }
+  async getDeviceIdsByTenant(entity_name, tenantUUID) {
+    try {
+      // Check if the collection exists
+      const collectionExist = check_collection_exist(entity_name);
+      if (!collectionExist) {
+        // Return null or an empty array
+        return [];
+      }
+
+      // Construct the filter to find devices by tenantUUID
+      const filter = {
+        tenant: tenantUUID,
+      };
+
+      // Use MongoDB find to get device IDs for the specified tenant
+      const devices = await this.db.db
+        .collection(entity_name)
+        .find(filter, { projection: { UUID: 1 } })
+        .toArray();
+      const deviceIds = devices.map((device) => device.UUID.toString()); // Assuming _id is ObjectId
+      return deviceIds;
+    } catch (error) {
+      console.error("Error in getDeviceIdsByTenant:", error);
+      return []; // or you can return null or throw an error
+    }
+  }
+  async getTenantIdsByUser(entity_name, userUUID) {
+    try {
+      const collectionExist = check_collection_exist(entity_name);
+      if (!collectionExist) {
+        return [];
+      }
+
+      const filter = {
+        UUID: userUUID,
+      };
+
+      const user = await this.db.db.collection(entity_name).findOne(filter);
+
+      if (!user || !user.tenants) {
+        return [];
+      }
+
+      const tenantIds = user.tenants.map((tenant) => tenant.UUID.toString());
+      console.log("tenant ids", tenantIds);
+      return tenantIds;
+    } catch (error) {
+      console.error("Error in getTenantIdsByUser:", error);
+      return [];
+    }
+  }
+
+  async getJobsCountByDeviceIds(entity_name, deviceIds) {
+    console.log("Received request for jobs with device IDs:", deviceIds);
+    console.log("Name", entity_name);
+    try {
+      // Check if the collection exists
+      const collectionExists = await this.db.db
+        .listCollections({ name: entity_name })
+        .hasNext();
+      if (!collectionExists) {
+        return { status: false, reason: "The collection doesn't exist" };
+      }
+      let totalCount = 0;
+      const cursor = await this.db.db.collection(entity_name).find();
+
+      let document;
+      while ((document = await cursor.next())) {
+        // Check if document has arguments and device_id property
+
+        if (document.arguments && document.arguments.device_id) {
+          // const deviceIdFromDB = document.arguments.device_id.toString();
+          const deviceIdFromDB = document.arguments.device_id;
+          const deviceIdFromFrontend = deviceIds.find(
+            (id) => id === deviceIdFromDB
+          );
+          if (deviceIdFromFrontend) {
+            console.log("Match found for Device ID:", deviceIdFromDB);
+            totalCount++;
+          }
+        }
+      }
+
+      console.log("Total Job Count:", totalCount);
+      return totalCount;
+    } catch (error) {
+      console.error("Error in getJobsCountByDeviceIds:", error);
+      return null;
+    }
+  }
+  //getting the selected jobs
+  // async getJobsByDeviceIds(entity_name, deviceIds) {
+  //   try {
+  //     // Check if the collection exists
+  //     const collectionExists = await this.db.db
+  //       .listCollections({ name: entity_name })
+  //       .hasNext();
+  //     if (!collectionExists) {
+  //       return { status: false, reason: "The collection doesn't exist" };
+  //     }
+  //     let totalCount = 0;
+  //     const cursor = await this.db.db.collection(entity_name).find();
+
+  //     let document;
+  //     while ((document = await cursor.next())) {
+  //       // Check if document has arguments and device_id property
+
+  //       if (document.arguments && document.arguments.device_id) {
+  //         // const deviceIdFromDB = document.arguments.device_id.toString();
+  //         const deviceIdFromDB = document.arguments.device_id;
+  //         const deviceIdFromFrontend = deviceIds
+  //           .find((id) => id === deviceIdFromDB)
+  //           .countDocuments();
+  //         if (deviceIdFromFrontend) {
+  //           return deviceIdFromDB;
+  //         }
+  //       }
+  //     }
+
+  //     return deviceIdFromDB;
+  //   } catch (error) {
+  //     console.error("Error in getJobsCountByDeviceIds:", error);
+  //     return null;
+  //   }
+  // }
+  async getJobsByDeviceIds(entity_name, deviceIds) {
+    try {
+      // Check if the collection exists
+      const collectionExists = await this.db.db
+        .listCollections({ name: entity_name })
+        .hasNext();
+
+      if (!collectionExists) {
+        return { status: false, reason: "The collection doesn't exist" };
+      }
+
+      let count = 0;
+
+      // Use MongoDB find to get documents in the collection
+      const cursor = await this.db.db.collection(entity_name).find();
+
+      while (await cursor.hasNext()) {
+        const document = await cursor.next();
+
+        // Check if document has arguments and device_id property
+        if (document.arguments && document.arguments.device_id) {
+          const deviceIdFromDB = document.arguments.device_id.toString();
+
+          // Check if the device ID from the database is in the provided deviceIds array
+          if (deviceIds.includes(deviceIdFromDB)) {
+            count++;
+          }
+        }
+      }
+
+      return { status: true, count };
+    } catch (error) {
+      console.error("Error in getJobsCountByDeviceIds:", error);
+      return { status: false, reason: "Error accessing the database" };
+    }
+  }
+
+  //getting device names
+  async getDeviceNamesByDeviceIds(entity_name, deviceId) {
+    console.log("collection and id :", entity_name, deviceId);
+    try {
+      // Check if the collection exists
+      const collectionExist = check_collection_exist(entity_name);
+      if (!collectionExist) {
+        // Return null or an empty array if the collection doesn't exist
+        return [];
+      }
+
+      // Construct the filter to find devices by UUID
+      const filter = {
+        UUID: deviceId,
+      };
+
+      // Use MongoDB findOne to get the device document for the specified UUID
+      const device = await this.db.db.collection(entity_name).findOne(filter);
+      console.log("device id", device);
+      // Check if the device exists
+      if (!device) {
+        return [];
+      }
+
+      // Extract the device name from the device document
+      const deviceName = device.instance_name;
+
+      console.log("Device Name:", deviceName);
+      return [deviceName];
+    } catch (error) {
+      console.error("Error in getDeviceNamesByDeviceIds:", error);
+      return []; // or you can return null or throw an error
+    }
+  }
+  async getDeviceNamesByDeviceIdsJobs(entity_name, deviceId) {
+    console.log("collection and id :", entity_name);
+
+    try {
+      const collectionExist = check_collection_exist(entity_name);
+
+      if (!collectionExist) {
+        return [];
+      }
+
+      const filter = {
+        UUID: deviceId,
+      };
+
+      const device = await this.db.db.collection(entity_name).findOne(filter);
+      console.log("Device Name:", device.arguments.device_id);
+      if (!device) {
+        return [];
+      }
+
+      const deviceid = device;
+
+      return [deviceid];
+    } catch (error) {
+      console.error("Error :", error);
+      throw error; // Throw the error for better handling
+    }
+  }
   async createCollection(entity_name) {
     try {
       const collection_exist = check_collection_exist(entity_name);
@@ -292,7 +953,9 @@ class DBAccess {
     no_of_instances,
     start_of_instances,
     query_string,
-    query_string_fields
+    query_string_fields,
+    tenants,
+    users
   ) {
     try {
       const collection_exist = check_collection_exist(entity_name);
@@ -312,6 +975,28 @@ class DBAccess {
           filterDetTemp.push(filterTemp);
         }
         stringFilter["$or"] = filterDetTemp;
+      }
+
+      var tenantFilter = {};
+      if (tenants !== undefined && tenants.length > 0) {
+        var filterDetTemp = [];
+        for (let i = 0; i < tenants.length; i++) {
+          var filterTemp = {};
+          filterTemp["tenant"] = tenants[i];
+          filterDetTemp.push(filterTemp);
+        }
+        tenantFilter["$or"] = filterDetTemp;
+      }
+
+      var userFilter = {};
+      if (users !== undefined && users.length > 0) {
+        var filterDetTemp = [];
+        for (let i = 0; i < users.length; i++) {
+          var filterTemp = {};
+          filterTemp["created_by"] = users[i];
+          filterDetTemp.push(filterTemp);
+        }
+        userFilter["$or"] = filterDetTemp;
       }
 
       var queryFilter = {};
@@ -339,20 +1024,39 @@ class DBAccess {
         }
       }
 
+      var val_1 = Object.entries(stringFilter).length !== 0 ? 1 : 0;
+      var val_2 = Object.entries(tenantFilter).length !== 0 ? 1 : 0;
+      var val_3 = Object.entries(userFilter).length !== 0 ? 1 : 0;
+      var val_4 = Object.entries(queryFilter).length !== 0 ? 1 : 0;
+      var val = val_1 + val_2 + val_3 + val_4;
+
       var filter = {};
-      if (
-        Object.entries(stringFilter).length !== 0 &&
-        Object.entries(queryFilter).length !== 0
-      ) {
-        filter["$and"] = [stringFilter, queryFilter];
-      } else if (Object.entries(stringFilter).length !== 0) {
-        filter = { ...stringFilter };
-      } else if (Object.entries(queryFilter).length !== 0) {
-        filter = { ...queryFilter };
+      if (val === 1) {
+        if (Object.entries(stringFilter).length !== 0) {
+          filter = { ...stringFilter };
+        } else if (Object.entries(tenantFilter).length !== 0) {
+          filter = { ...tenantFilter };
+        } else if (Object.entries(userFilter).length !== 0) {
+          filter = { ...userFilter };
+        } else if (Object.entries(queryFilter).length !== 0) {
+          filter = { ...queryFilter };
+        }
+      } else if (val > 1) {
+        var tempFilter = [];
+        if (Object.entries(stringFilter).length !== 0) {
+          tempFilter.push(stringFilter);
+        }
+        if (Object.entries(tenantFilter).length !== 0) {
+          tempFilter.push(tenantFilter);
+        }
+        if (Object.entries(userFilter).length !== 0) {
+          tempFilter.push(userFilter);
+        }
+        if (Object.entries(queryFilter).length !== 0) {
+          tempFilter.push(queryFilter);
+        }
+        filter["$and"] = tempFilter;
       }
-
-      console.log(filter);
-
       const results = [];
       const result =
         sort_by &&
@@ -390,7 +1094,6 @@ class DBAccess {
               .sort([sort_by, sort_direction])
               .count()
           : await this.db.db.collection(entity_name).find(filter).count();
-      console.log(noOfInstances);
       if (unshaped !== true) {
         var filterDet = {};
         filterDet["entity_name"] = entity_name;
@@ -414,7 +1117,9 @@ class DBAccess {
     value,
     direction,
     sort_by,
-    sort_direction
+    sort_direction,
+    tenants,
+    users
   ) {
     try {
       const collection_exist = check_collection_exist(entity_name);
@@ -422,29 +1127,80 @@ class DBAccess {
         return { status: false, reason: "The collection doesn't exist" };
       }
 
-      var filter = {};
+      var tenantFilter = {};
+      if (tenants !== undefined && tenants.length > 0) {
+        var filterDetTemp = [];
+        for (let i = 0; i < tenants.length; i++) {
+          var filterTemp = {};
+          filterTemp["tenant"] = tenants[i];
+          filterDetTemp.push(filterTemp);
+        }
+        tenantFilter["$or"] = filterDetTemp;
+      }
+
+      var userFilter = {};
+      if (users !== undefined && users.length > 0) {
+        var filterDetTemp = [];
+        for (let i = 0; i < users.length; i++) {
+          var filterTemp = {};
+          filterTemp["created_by"] = users[i];
+          filterDetTemp.push(filterTemp);
+        }
+        userFilter["$or"] = filterDetTemp;
+      }
+
+      var queryFilter = {};
       if (find_by) {
         for (let i = 0; i < find_by.length; i++) {
           if (value[i] !== undefined && value[i] !== "undefined") {
             if (direction[i] === 1) {
-              if (filter[find_by[i]]) {
-                filter[find_by[i]].$gte = value[i];
+              if (queryFilter[find_by[i]]) {
+                queryFilter[find_by[i]].$gte = value[i];
               } else {
-                filter[find_by[i]] = { $gte: value[i] };
+                queryFilter[find_by[i]] = { $gte: value[i] };
               }
             } else if (direction[i] === -1) {
-              if (filter[find_by[i]]) {
-                filter[find_by[i]].$lte = value[i];
+              if (queryFilter[find_by[i]]) {
+                queryFilter[find_by[i]].$lte = value[i];
               } else {
-                filter[find_by[i]] = { $lte: value[i] };
+                queryFilter[find_by[i]] = { $lte: value[i] };
               }
             } else {
               if (find_by[i] !== null && find_by[i] !== undefined) {
-                filter[find_by[i]] = value[i];
+                queryFilter[find_by[i]] = value[i];
               }
             }
           }
         }
+      }
+
+      var filter = {};
+      var val_2 = Object.entries(tenantFilter).length !== 0 ? 1 : 0;
+      var val_3 = Object.entries(userFilter).length !== 0 ? 1 : 0;
+      var val_4 = Object.entries(queryFilter).length !== 0 ? 1 : 0;
+      var val = val_2 + val_3 + val_4;
+
+      var filter = {};
+      if (val === 1) {
+        if (Object.entries(tenantFilter).length !== 0) {
+          filter = { ...tenantFilter };
+        } else if (Object.entries(userFilter).length !== 0) {
+          filter = { ...userFilter };
+        } else if (Object.entries(queryFilter).length !== 0) {
+          filter = { ...queryFilter };
+        }
+      } else if (val > 1) {
+        var tempFilter = [];
+        if (Object.entries(tenantFilter).length !== 0) {
+          tempFilter.push(tenantFilter);
+        }
+        if (Object.entries(userFilter).length !== 0) {
+          tempFilter.push(userFilter);
+        }
+        if (Object.entries(queryFilter).length !== 0) {
+          tempFilter.push(queryFilter);
+        }
+        filter["$and"] = tempFilter;
       }
 
       const results = [];
@@ -474,10 +1230,13 @@ class DBAccess {
       if (!collection_exist) {
         return { status: false, reason: "The collection doesn't exist" };
       }
+      console.log("entityname", entity_name);
 
       var filter = {};
       filter[find_by] = value;
+      console.log("filter", filter);
       const result = await this.db.db.collection(entity_name).findOne(filter);
+      console.log("result", result);
       if (result) {
         if (unshaped !== true) {
           var filterDet = {};
@@ -486,6 +1245,7 @@ class DBAccess {
           const shape = await this.db.db
             .collection("collection_details")
             .findOne(filterDet);
+
           if (shape) {
             const data = await reshape(shape, [result]);
             if (data.instances && data.instances[0]) {
@@ -499,6 +1259,23 @@ class DBAccess {
       }
     } catch {
       return { status: false, reason: "Was not able to access the database" };
+    }
+  }
+
+  async getTenantDetails(tenantUUID) {
+    try {
+      const tenant_entity = "tenants";
+      console.log("GetTenant", tenantUUID);
+      const result = await this.getInstance(tenant_entity, "UUID", tenantUUID);
+
+      if (result.status && result.instance) {
+        return { status: true, instance: result.instance };
+      } else {
+        return { status: false, reason: "Tenant not found" };
+      }
+    } catch (error) {
+      console.error("Error in getTenantDetails:", error);
+      return { status: false, reason: "Internal server error" };
     }
   }
 
@@ -653,6 +1430,79 @@ class DBAccess {
       }
     } catch {
       return;
+    }
+  }
+  async getJobDetailsByDeviceIds(entityName, deviceIds) {
+    try {
+      const collection = this.db.db.collection(entityName);
+
+      // Convert deviceIds to ObjectId if needed
+      const deviceIdsAsString = deviceIds.map((deviceId) => String(deviceId));
+      const jobDetails = await collection
+        .find({ "arguments.device_id": { $in: deviceIdsAsString } })
+        .toArray();
+
+      console.log("Details have", jobDetails);
+      return jobDetails;
+    } catch (error) {
+      console.error("Error in getJobDetailsByDeviceIds:", error);
+      throw error;
+    }
+  }
+  async getJobDetailsAll(entityName, deviceIds) {
+    try {
+      const collection = this.db.db.collection(entityName);
+
+      // Convert deviceIds to ObjectId if needed
+      const query = {
+        "arguments.device_id": { $type: "string", $nin: [null, "null"] },
+      };
+      const jobDetails = await collection.find(query).toArray();
+
+      // const jobDetails = await collection
+      //   .find({ "arguments.device_id": { $in: deviceIdsAsString } })
+      //   .toArray();
+
+      console.log("Details have All", jobDetails);
+      return jobDetails;
+    } catch (error) {
+      console.error("Error in getJobDetailsByDeviceIds:", error);
+      throw error;
+    }
+  }
+  async getJobsIds(entity_name, jobUUID) {
+    try {
+      // Check if the collection exists
+      const collectionExist = check_collection_exist(entity_name);
+      if (!collectionExist) {
+        // Return null or an empty array if the collection doesn't exist
+        return [];
+      }
+
+      // Construct the filter to find a user by UUID
+      const filter = {
+        UUID: jobUUID,
+        arguments,
+      };
+
+      // Use MongoDB find to get the user document for the specified UUID
+      const job = await this.db.db.collection(entity_name).findOne(filter);
+
+      // Check if the user exists
+      if (!job) {
+        return [];
+      }
+
+      // Extract the UUIDs of the associated jobs dveices
+      const deviceIds = job.map((deviceid) =>
+        deviceid.device_id.UUID.toString()
+      );
+
+      console.log("device idsss", job);
+      return deviceIds;
+    } catch (error) {
+      console.error("Error in get device id:", error);
+      return []; // or you can return null or throw an error
     }
   }
 }

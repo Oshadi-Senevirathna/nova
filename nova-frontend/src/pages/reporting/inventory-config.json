@@ -24,7 +24,7 @@
             "formFillRequired": true
         },
         {
-            "name": "username",
+            "name": "user",
             "numeric": false,
             "label": "Username",
             "options": {
@@ -34,7 +34,7 @@
             "noFormView": true
         },
         {
-            "name": "linux_dist",
+            "name": "linux_distribution",
             "numeric": false,
             "label": "Linux Distribution",
             "options": {
@@ -76,7 +76,7 @@
         {
             "name": "last_active",
             "numeric": false,
-            "label": "Last seen active",
+            "label": "Last active",
             "options": {
                 "filter": true,
                 "sort": true
@@ -102,6 +102,9 @@
                 "sort": true
             },
             "noFormView": true
+        },
+        {
+            "name":"last_active"
         }
     ]
 }

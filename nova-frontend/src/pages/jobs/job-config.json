@@ -22,6 +22,15 @@
             }
         },
         {
+            "name": "batch_no",
+            "numeric": false,
+            "label": "Batch Number",
+            "options": {
+                "filter": false,
+                "sort": true
+            }
+        },
+        {
             "name": "created_at",
             "numeric": false,
             "label": "Created at",
@@ -30,6 +39,7 @@
                 "sort": true
             }
         },
+
         {
             "name": "error",
             "numeric": false,

@@ -1,5 +1,7 @@
 import { BehaviorSubject } from 'rxjs';
 
+export const USER_TYPE_SUPER_ADMIN = 'superadmin';
+
 export const ENTITY_NAME_USERS = 'users';
 export const ENTITY_NAME_USER_ROLES = 'user_roles';
 export const ENTITY_NAME_USER_PRIVILEGES = 'user_privileges';
@@ -62,18 +64,18 @@ class EntityCache {
     }
 
     clear() {
-        console.log('EntityCache:clear');
+        //console.log('EntityCache:clear');
         this.mapEntitySubscriptions.forEach((subscription) => subscription.close());
         this.mapEntitySubscriptions.clear();
     }
 
     removeEntitySubscription(entityName) {
-        console.log('EntityCache:removeEntitySubscription: ', entityName);
+        //console.log('EntityCache:removeEntitySubscription: ', entityName);
         this.mapEntitySubscriptions.remove(entityName);
     }
 
     getEntitySubscription(entityName) {
-        console.log('EntityCache:getEntitySubscription: ', entityName);
+        //console.log('EntityCache:getEntitySubscription: ', entityName);
         if (this.mapEntitySubscriptions.has(entityName)) {
             return this.mapEntitySubscriptions.get(entityName);
         }

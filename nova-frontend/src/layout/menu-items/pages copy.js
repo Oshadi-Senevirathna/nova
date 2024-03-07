@@ -11,7 +11,12 @@ import {
     UnorderedListOutlined,
     ContainerOutlined,
     ClockCircleOutlined,
-    BankOutlined
+    BankOutlined,
+    AreaChartOutlined,
+    ControlOutlined,
+    DashboardOutlined,
+    UnorderedListOutlined,
+    AreaChartOutlined
 } from '@ant-design/icons';
 // icons
 const icons = {
@@ -26,7 +31,12 @@ const icons = {
     UnorderedListOutlined,
     ContainerOutlined,
     ClockCircleOutlined,
-    BankOutlined
+    BankOutlined,
+    AreaChartOutlined,
+    ControlOutlined,
+    DashboardOutlined,
+    UnorderedListOutlined,
+    AreaChartOutlined
 };
 
 // ==============================|| MENU ITEMS - EXTRA PAGES ||============================== //
@@ -36,6 +46,14 @@ const pages = {
     title: 'Application',
     type: 'group',
     children: [
+        {
+            id: 'dashboard',
+            title: 'Dashboard',
+            type: 'item',
+            url: '/dashboard/default',
+            icon: icons.DashboardOutlined,
+            breadcrumbs: false
+        },
         {
             id: 'inventory',
             title: 'Inventory',
@@ -79,7 +97,7 @@ const pages = {
             icon: icons.ContainerOutlined
         },
         {
-            id: 'orchestration',
+            id: 'Orchestration',
             title: 'Orchestration',
             type: 'item',
             url: '/orchestration',
@@ -114,6 +132,20 @@ const pages = {
             icon: icons.BankOutlined
         },
         {
+            id: 'roles',
+            title: 'Roles',
+            type: 'item',
+            url: '/roles',
+            icon: icons.ControlOutlined
+        },
+        {
+            id: 'role_details',
+            title: 'Role Details',
+            type: 'crumb',
+            url: '/roles/details',
+            icon: icons.ControlOutlined
+        },
+        {
             id: 'users',
             title: 'Users',
             type: 'item',
@@ -140,6 +172,13 @@ const pages = {
             type: 'item',
             url: '/logs',
             icon: icons.UnorderedListOutlined
+        },
+        {
+            id: 'reporting',
+            title: 'Reporting',
+            type: 'item',
+            url: '/reporting',
+            icon: icons.AreaChartOutlined
         }
     ]
 };

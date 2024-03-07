@@ -1,7 +1,10 @@
 import PropTypes from 'prop-types';
 import { useRef, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import serviceFactoryInstance from 'framework/services/service-factory';
+// import { setSelectedTenant, setTenantDetails } from 'store/reducers/menu';
+import selectedTenant, { setSelectedTenant } from 'store/reducers/selectedTenant';
+
+import { ENTITY_NAME_USER_ROLES, ENTITY_NAME_USERS } from '../../../../../framework/caching/entity-cache';
 // material-ui
 import { useTheme } from '@mui/material/styles';
 import {
@@ -23,7 +26,9 @@ import MainCard from 'components/MainCard';
 import Transitions from 'components/@extended/Transitions';
 // assets
 import { FilterFilled } from '@ant-design/icons';
-import { ENTITY_NAME_TENANT } from 'framework/caching/entity-cache';
+import { useDispatch, useSelector } from 'react-redux';
+
+import { useParams } from '../../../../../../node_modules/react-router-dom/dist/index';
 
 // tab panel wrapper
 function TabPanel({ children, value, index, ...other }) {
@@ -51,36 +56,197 @@ function a11yProps(index) {
 
 const Tenant = () => {
     const theme = useTheme();
-    const navigate = useNavigate();
     const [tenant, setTenant] = useState();
     const [tenants, setTenants] = useState([]);
+    const [userRoleUUID, setuserRoleUUID] = useState([]);
+    const [userRole, setuserRole] = useState([]);
+
+    const dispatch = useDispatch();
+    const [currentUser, setCurrentUser] = useState(null);
+    const [currentUUID, setCurrentUUID] = useState();
+    const { UUID } = useSelector((state) => state.selectedTenant);
 
     useEffect(() => {
-        const tenantsSub = serviceFactoryInstance.dataLoaderService.dataSub(ENTITY_NAME_TENANT).subscribe((data) => {
-            if (data) {
-                var allTenant = {};
-                allTenant.instance_name = 'All';
-                allTenant.UUID = 0;
-                const tempTenantList = data;
-                tempTenantList.push(allTenant);
-
-                setTenant(allTenant);
-                serviceFactoryInstance.authService.setTenant(allTenant);
-
-                setTenants(tempTenantList);
-            }
+        const userSubscription = serviceFactoryInstance.authService.getUserObservable().subscribe((user) => {
+            setCurrentUser(user);
         });
-
         return () => {
-            tenantsSub.unsubscribe();
+            userSubscription.unsubscribe();
         };
-    }, [serviceFactoryInstance.cache]);
+    }, []);
+
+    useEffect(() => {
+        if (currentUser) {
+            setCurrentUUID(currentUser.UUID);
+        }
+    }, [currentUser]);
+
+    useEffect(() => {
+        if (currentUUID !== 0) {
+            serviceFactoryInstance.dataLoaderService.getInstance(currentUUID, ENTITY_NAME_USERS).then((data) => {
+                if (data.status) {
+                    console.log('Role', data.instance.roles);
+                    setuserRoleUUID(data.instance.roles);
+                }
+            });
+        }
+    }, [currentUUID]);
+
+    const UserRole = async (roleUUID) => {
+        try {
+            const data = await serviceFactoryInstance.dataLoaderService.getRoleName(ENTITY_NAME_USER_ROLES, roleUUID);
+            console.log('Datacame', data);
+            if (data && data.status) {
+                return data;
+            } else {
+                return null;
+            }
+        } catch (error) {
+            console.error('Error fetching role name:', error);
+            throw error;
+        }
+    };
+
+    // const TenantForUser = async (currentUUID) => {
+    //     try {
+    //         const data = serviceFactoryInstance.dataLoaderService.getTenant(ENTITY_NAME_USERS, currentUUID);
+
+    //         // if (tenants && tenants.status) {
+    //         //     console.log('tenants', tenants.Promise.tenants.instance_name);
+    //         //     return tenants;
+    //         // } else {
+    //         //     return null;
+    //         // }
+    //         if (data) {
+    //             console.log('DB', data);
+    //             for (let i = 0; i < data.tenants.length; i++) {
+    //                 if (data.tenants[i].UUID === 0) {
+    //                     setTenant(data.tenants[i]);
+    //                 }
+    //             }
+    //             console.log('Data tenants here', data.tenants);
+    //             setTenants(data.tenants);
+    //         }
+    //     } catch (error) {
+    //         console.error('Error fetching tenant:', error);
+    //         throw error;
+    //     }
+    // };
+    const TenantForUser = async (currentUUID) => {
+        if (tenant.UUID == 0) {
+            try {
+                serviceFactoryInstance.authService.getUserObservable().subscribe((data) => {
+                    if (data) {
+                        for (let i = 0; i < data.tenants.length; i++) {
+                            if (data.tenants[i].UUID === 0) {
+                                setTenant(data.tenants[i]);
+                            }
+                        }
+                        console.log('Data tenants here', data.tenants);
+                        setTenants(data.tenants);
+                    }
+                });
+            } catch (error) {}
+        } else {
+            try {
+                const data = await serviceFactoryInstance.dataLoaderService.getTenant(ENTITY_NAME_USERS, currentUUID);
+                console.log('db', data);
+                if (data && data.length > 0) {
+                    const tenants = data;
+
+                    setTenants(tenants);
+
+                    tenants.forEach((tenant) => {
+                        console.log('UUID:', tenant.UUID);
+                        console.log('Instance Name:', tenant.instance_name);
+                    });
+
+                    // const tenantWithUUID0 = tenants.find((tenant) => tenant.UUID === 0);
+                    // if (tenantWithUUID0) {
+                    //     setTenant(tenantWithUUID0);
+
+                    // }
+                } else {
+                    console.log('Invalid data structure or no tenants found:', data);
+                }
+                // if (data) {
+                //     console.log('Data tenants here', data.tenants);
+                //     setTenants(data);
+                // }
+            } catch (error) {
+                console.error('Error fetching tenant:', error);
+                throw error;
+            }
+        }
+    };
+
+    const TenantForSuperAdmin = async () => {
+        try {
+            serviceFactoryInstance.authService.getUserObservable().subscribe((data) => {
+                if (data) {
+                    for (let i = 0; i < data.tenants.length; i++) {
+                        if (data.tenants[i].UUID === 0) {
+                            setTenant(data.tenants[i]);
+                        }
+                    }
+                    console.log('Data tenants here', data.tenants);
+                    setTenants(data.tenants);
+                }
+            });
+        } catch (error) {}
+    };
+
+    useEffect(() => {
+        const fetchRoleName = async () => {
+            try {
+                const roleName = await UserRole(userRoleUUID);
+                console.log('Role Name in tenant page:', roleName.roleName.roleName);
+                setuserRole(roleName.roleName.roleName);
+            } catch (error) {}
+        };
+
+        fetchRoleName();
+    }, [userRoleUUID]);
+
+    useEffect(() => {
+        if (userRole == 'User Role' || userRole == 'Insync Role' || userRole == 'Admin Role') {
+            TenantForUser(currentUUID);
+        } else {
+            TenantForSuperAdmin();
+        }
+    }, [userRole]);
 
     const handleSelect = (tenantSelect) => {
-        setTenant(tenantSelect);
+        if (tenantSelect.instance_name.toLowerCase() === 'all') {
+            // If instance_name is "All", set tenantUUID to "0"
+            tenantSelect.UUID = 0;
+        }
         serviceFactoryInstance.authService.setTenant(tenantSelect);
+        setTenant(tenantSelect);
+        dispatch(
+            setSelectedTenant({
+                UUID: tenantSelect.UUID,
+                instance_name: ''
+            })
+        );
+
         setOpen(false);
     };
+
+    // const getTenantDetails = async () => {
+    //     try {
+    //         const response = await serviceFactoryInstance.dataLoaderService.getSelectedTenantDetails(UUID);
+
+    //     } catch (error) {
+    //         console.error('Error fetching tenant details:', error);
+    //     }
+    // };
+
+    // useEffect(() => {
+    //     if (UUID) {
+    //         getTenantDetails();
+    //     }
+    // }, [UUID]);
 
     const anchorRef = useRef(null);
     const [open, setOpen] = useState(false);
@@ -96,6 +262,9 @@ const Tenant = () => {
     };
 
     const iconBackColorOpen = 'grey.300';
+    useEffect(() => {
+        console.log(UUID);
+    }, [UUID]);
 
     return (
         <Box sx={{ flexShrink: 0, ml: 0.75 }}>
@@ -114,6 +283,7 @@ const Tenant = () => {
             >
                 <Stack direction="row" spacing={2} alignItems="center" sx={{ p: 0.5 }}>
                     <FilterFilled />
+
                     {tenant ? (
                         <Typography variant="subtitle1">Tenant : {tenant.instance_name}</Typography>
                     ) : (
